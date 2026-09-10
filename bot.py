@@ -11,10 +11,10 @@ from aiogram.types import (
 from aiocryptopay import AioCryptoPay, Networks
 
 # ==================== ТОКЕНДЕР ====================
-BOT_TOKEN =
-CRYPTO_TOKEN =
-ADMIN_ID =
-CHAT_LINK =
+BOT_TOKEN = os.getenv("BOT_TOKEN", "")
+CRYPTO_TOKEN = os.getenv("CRYPTO_TOKEN", "")
+ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
+CHAT_LINK = os.getenv("CHAT_LINK", "")
 
 # ==================== СТАВКА ШЕКТЕУЛЕРІ ====================
 BET_MIN = 0.1
