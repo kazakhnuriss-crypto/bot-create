@@ -10,7 +10,7 @@ from aiogram.types import (
 )
 from aiocryptopay import AioCryptoPay, Networks
 
-# ==================== ТОКЕНДЕР ====================
+# ==================== ТОКЕНДЕР (Railway Variables) ====================
 BOT_TOKEN = os.getenv("BOT_TOKEN", "")
 CRYPTO_TOKEN = os.getenv("CRYPTO_TOKEN", "")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
@@ -22,7 +22,8 @@ BET_MAX = 10000.0
 BET_DEFAULT = 0.1
 BET_STEP = 0.5
 WITHDRAW_MIN = 1.0
-REF_PERCENT = 0.10   # 10% реферал бонусы
+REF_PERCENT = 0.10
+START_BONUS = 100.0
 
 # ==================== ЛОГИКА ====================
 logging.basicConfig(level=logging.INFO)
@@ -188,7 +189,7 @@ async def cmd_start(m: types.Message):
             pass
     u = get_user(uid)
     if u["balance"] == 0.0:
-        u["balance"] = 100.0
+        u["balance"] = START_BONUS
     await m.answer(menu_text(uid), reply_markup=main_menu(uid), parse_mode="HTML")
     await m.answer("Меню 👇", reply_markup=bottom_menu())
 
@@ -274,15 +275,16 @@ async def cb_play(cb: types.CallbackQuery):
     dice_msg = await cb.message.answer_dice(emoji=g["emoji"])
     await asyncio.sleep(4)
     result = dice_msg.dice.value
+
     is_win, result_text = check_win(game_key, choice_key, result)
+
     if is_win:
         win = round(bet * choice["x"], 2)
         u["balance"] = round(u["balance"] - bet + win, 2)
         text = (
             f"🎉 <b>ПОБЕДА!</b>\n\n"
             f"{g['emoji']} {g['name']} — {choice['name']}\n"
-            f"Результат: <b>{result}</b>\n"
-            f"<i>{result_text}</i>\n"
+            f"<i>{result_text}</i>\n\n"
             f"➕ Выигрыш: <b>+{win}$</b>\n"
             f"💰 Баланс: <b>{u['balance']}$</b>"
         )
@@ -291,8 +293,7 @@ async def cb_play(cb: types.CallbackQuery):
         text = (
             f"😢 <b>ПРОИГРЫШ</b>\n\n"
             f"{g['emoji']} {g['name']} — {choice['name']}\n"
-            f"Результат: <b>{result}</b>\n"
-            f"<i>{result_text}</i>\n"
+            f"<i>{result_text}</i>\n\n"
             f"➖ Проигрыш: <b>-{bet}$</b>\n"
             f"💰 Баланс: <b>{u['balance']}$</b>"
         )
@@ -303,70 +304,76 @@ def check_win(game_key, choice_key, result):
     text = ""
     win = False
 
+    # ===== КОСТИ (🎲 1-6) =====
     if game_key == "dice":
         if choice_key == "more3":
             win = result >= 4
-            text = f"{result} {'больше' if win else 'не больше'} 3"
+            text = f"Выпало {result} → {'больше 3 ✅' if win else 'НЕ больше 3 ❌'}"
         elif choice_key == "less3":
             win = result <= 2
-            text = f"{result} {'меньше' if win else 'не меньше'} 3"
+            text = f"Выпало {result} → {'меньше 3 ✅' if win else 'НЕ меньше 3 ❌'}"
         elif choice_key == "even":
             win = result % 2 == 0
-            text = f"{result} — {'чётное' if win else 'нечётное'}"
+            text = f"Выпало {result} → {'чётное ✅' if win else 'НЕчётное ❌'}"
         elif choice_key == "odd":
             win = result % 2 == 1
-            text = f"{result} — {'нечётное' if win else 'чётное'}"
+            text = f"Выпало {result} → {'нечётное ✅' if win else 'Чётное ❌'}"
 
+    # ===== ФУТБОЛ (⚽ 1-5) =====
     elif game_key == "football":
         is_goal = result >= 4
         if choice_key == "goal":
             win = is_goal
-            text = "⚽ Гол!" if is_goal else "Промах"
+            text = f"Выпало {result} → {'ГОЛ ✅' if win else 'Промах ❌'}"
         elif choice_key == "miss":
             win = not is_goal
-            text = "Промах" if not is_goal else "⚽ Гол!"
+            text = f"Выпало {result} → {'Промах ✅' if win else 'ГОЛ ❌'}"
 
+    # ===== БАСКЕТБОЛ (🏀 1-5) =====
     elif game_key == "basketball":
         is_goal = result >= 4
         if choice_key == "goal":
             win = is_goal
-            text = "🏀 Гол!" if is_goal else "Промах"
+            text = f"Выпало {result} → {'ГОЛ ✅' if win else 'Промах ❌'}"
         elif choice_key == "miss":
             win = not is_goal
-            text = "Промах" if not is_goal else "🏀 Гол!"
+            text = f"Выпало {result} → {'Промах ✅' if win else 'ГОЛ ❌'}"
 
+    # ===== ДАРТС (🎯 1-6) =====
     elif game_key == "darts":
         if choice_key == "center":
             win = result == 6
-            text = "🎯 В центр!" if win else f"Не в центр ({result})"
+            text = f"Выпало {result} → {'ЦЕНТР ✅' if win else 'Не центр ❌'}"
         elif choice_key == "red":
             win = result == 5
-            text = "🔴 Красный!" if win else f"Не красный ({result})"
+            text = f"Выпало {result} → {'Красный ✅' if win else 'Не красный ❌'}"
         elif choice_key == "white":
             win = result in [3, 4]
-            text = "⚪ Белый!" if win else f"Не белый ({result})"
+            text = f"Выпало {result} → {'Белый ✅' if win else 'Не белый ❌'}"
         elif choice_key == "bounce":
             win = result in [1, 2]
-            text = "↩️ Отскок" if win else f"Не отскок ({result})"
+            text = f"Выпало {result} → {'Отскок ✅' if win else 'Не отскок ❌'}"
 
+    # ===== БОУЛИНГ (🎳 1-6) =====
     elif game_key == "bowling":
         if choice_key == "strike":
             win = result == 6
-            text = "🎳 Страйк!" if win else f"Не страйк ({result})"
+            text = f"Выпало {result} → {'СТРАЙК ✅' if win else 'Не страйк ❌'}"
         elif choice_key == "miss":
             win = result <= 1
-            text = "❌ Промах" if win else f"Сбито {result}"
+            text = f"Выпало {result} → {'Промах ✅' if win else 'Не промах ❌'}"
         elif choice_key == "some":
             win = 2 <= result <= 5
-            text = f"Сбито {result}" if win else f"Не часть ({result})"
+            text = f"Выпало {result} → {'Часть сбита ✅' if win else 'Не часть ❌'}"
 
+    # ===== 777 (🎰 1-64) =====
     elif game_key == "slot":
         if choice_key == "777":
             win = result == 64
-            text = "🎰 ДЖЕКПОТ 777!" if win else f"Не 777 ({result})"
+            text = f"Выпало {result} → {'ДЖЕКПОТ ✅' if win else 'Не 777 ❌'}"
         elif choice_key == "any":
             win = result >= 1
-            text = f"Выпало {result}"
+            text = f"Выпало {result} → {'Любая ✅' if win else 'Пусто ❌'}"
 
     return win, text
 
@@ -558,7 +565,6 @@ async def set_bet_text(m: types.Message):
     u = get_user(uid)
     val = float(m.text)
 
-    # ===== СТАВКА =====
     if u.get("await_bet"):
         if val < BET_MIN:
             await m.answer(f"❌ Мин: {BET_MIN}$")
@@ -571,7 +577,6 @@ async def set_bet_text(m: types.Message):
         await m.answer(f"✅ <b>Ставка: {u['bet']}$</b>", parse_mode="HTML", reply_markup=main_menu(uid))
         return
 
-    # ===== ПОПОЛНЕНИЕ =====
     if u.get("await_dep"):
         if val < 1:
             await m.answer("❌ Мин: 1$")
@@ -583,7 +588,6 @@ async def set_bet_text(m: types.Message):
         await create_deposit_invoice(m, uid, val)
         return
 
-    # ===== ВЫВОД =====
     if u.get("await_withdraw"):
         u["await_withdraw"] = False
 
