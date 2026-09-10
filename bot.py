@@ -20,10 +20,8 @@ CHAT_LINK = os.getenv("CHAT_LINK", "")
 BET_MIN = 0.1
 BET_MAX = 10000.0
 BET_DEFAULT = 0.1
-BET_STEP = 0.5
 WITHDRAW_MIN = 1.0
 REF_PERCENT = 0.10
-START_BONUS = 100.0
 
 # ==================== ЛОГИКА ====================
 logging.basicConfig(level=logging.INFO)
@@ -129,9 +127,7 @@ def main_menu(uid):
             InlineKeyboardButton(text="💬 Игровой чат ↗", url=CHAT_LINK),
         ],
         [
-            InlineKeyboardButton(text="➖", callback_data="bet_down"),
-            InlineKeyboardButton(text=f"💵 Ставка: {bet}$", callback_data="bet_set"),
-            InlineKeyboardButton(text="➕", callback_data="bet_up"),
+            InlineKeyboardButton(text=f"💵 Ставка: {bet}$", callback_data="bet_menu"),
         ],
         [
             InlineKeyboardButton(text="💳 Пополнить", callback_data="deposit"),
@@ -139,6 +135,29 @@ def main_menu(uid):
         ],
     ])
     return kb
+
+
+def bet_menu():
+    """Ставка таңдау мәзірі — дайын сомалар"""
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="0.1$", callback_data="setbet_0.1"),
+            InlineKeyboardButton(text="0.5$", callback_data="setbet_0.5"),
+            InlineKeyboardButton(text="1$", callback_data="setbet_1"),
+        ],
+        [
+            InlineKeyboardButton(text="5$", callback_data="setbet_5"),
+            InlineKeyboardButton(text="10$", callback_data="setbet_10"),
+            InlineKeyboardButton(text="25$", callback_data="setbet_25"),
+        ],
+        [
+            InlineKeyboardButton(text="50$", callback_data="setbet_50"),
+            InlineKeyboardButton(text="100$", callback_data="setbet_100"),
+            InlineKeyboardButton(text="500$", callback_data="setbet_500"),
+        ],
+        [InlineKeyboardButton(text="✏️ Ввести свою сумму", callback_data="bet_custom")],
+        [InlineKeyboardButton(text="⬅️ Назад", callback_data="back_menu")],
+    ])
 
 
 def menu_text(uid):
@@ -188,8 +207,6 @@ async def cmd_start(m: types.Message):
         except:
             pass
     u = get_user(uid)
-    if u["balance"] == 0.0:
-        u["balance"] = START_BONUS
     await m.answer(menu_text(uid), reply_markup=main_menu(uid), parse_mode="HTML")
     await m.answer("Меню 👇", reply_markup=bottom_menu())
 
@@ -219,6 +236,48 @@ async def btn_menu(m: types.Message):
         [InlineKeyboardButton(text="📤 Вывести", callback_data="withdraw")],
     ])
     await m.answer("☰ <b>Меню</b>", reply_markup=kb, parse_mode="HTML")
+
+
+# ==================== BET MENU ====================
+@dp.callback_query(F.data == "bet_menu")
+async def cb_bet_menu(cb: types.CallbackQuery):
+    u = get_user(cb.from_user.id)
+    await cb.message.answer(
+        f"💵 <b>Выберите сумму ставки</b>\n\n"
+        f"Текущая: <b>{u['bet']}$</b>\n"
+        f"Мин: <b>{BET_MIN}$</b>\n"
+        f"Макс: <b>{BET_MAX}$</b>",
+        reply_markup=bet_menu(),
+        parse_mode="HTML"
+    )
+    await cb.answer()
+
+
+@dp.callback_query(F.data.startswith("setbet_"))
+async def cb_setbet(cb: types.CallbackQuery):
+    val = float(cb.data.replace("setbet_", ""))
+    u = get_user(cb.from_user.id)
+    u["bet"] = val
+    await cb.message.edit_text(
+        menu_text(cb.from_user.id),
+        reply_markup=main_menu(cb.from_user.id),
+        parse_mode="HTML"
+    )
+    await cb.answer(f"✅ Ставка: {val}$")
+
+
+@dp.callback_query(F.data == "bet_custom")
+async def cb_bet_custom(cb: types.CallbackQuery):
+    u = get_user(cb.from_user.id)
+    u["await_bet"] = True
+    await cb.message.answer(
+        f"✏️ <b>Введите сумму ставки</b>\n\n"
+        f"Мин: <b>{BET_MIN}$</b>\n"
+        f"Макс: <b>{BET_MAX}$</b>\n\n"
+        f"Например: <code>15</code> или <code>150.5</code>",
+        parse_mode="HTML"
+    )
+    await cb.answer()
 
 
 # ==================== GAME MENU ====================
@@ -304,7 +363,6 @@ def check_win(game_key, choice_key, result):
     text = ""
     win = False
 
-    # ===== КОСТИ (🎲 1-6) =====
     if game_key == "dice":
         if choice_key == "more3":
             win = result >= 4
@@ -319,9 +377,8 @@ def check_win(game_key, choice_key, result):
             win = result % 2 == 1
             text = f"Выпало {result} → {'нечётное ✅' if win else 'Чётное ❌'}"
 
-    # ===== ФУТБОЛ (⚽ 1-5) =====
     elif game_key == "football":
-        is_goal = result >= 3
+        is_goal = result >= 4
         if choice_key == "goal":
             win = is_goal
             text = f"Выпало {result} → {'ГОЛ ✅' if win else 'Промах ❌'}"
@@ -329,7 +386,6 @@ def check_win(game_key, choice_key, result):
             win = not is_goal
             text = f"Выпало {result} → {'Промах ✅' if win else 'ГОЛ ❌'}"
 
-    # ===== БАСКЕТБОЛ (🏀 1-5) =====
     elif game_key == "basketball":
         is_goal = result >= 4
         if choice_key == "goal":
@@ -339,7 +395,6 @@ def check_win(game_key, choice_key, result):
             win = not is_goal
             text = f"Выпало {result} → {'Промах ✅' if win else 'ГОЛ ❌'}"
 
-    # ===== ДАРТС (🎯 1-6) =====
     elif game_key == "darts":
         if choice_key == "center":
             win = result == 6
@@ -354,7 +409,6 @@ def check_win(game_key, choice_key, result):
             win = result in [1, 2]
             text = f"Выпало {result} → {'Отскок ✅' if win else 'Не отскок ❌'}"
 
-    # ===== БОУЛИНГ (🎳 1-6) =====
     elif game_key == "bowling":
         if choice_key == "strike":
             win = result == 6
@@ -366,7 +420,6 @@ def check_win(game_key, choice_key, result):
             win = 2 <= result <= 5
             text = f"Выпало {result} → {'Часть сбита ✅' if win else 'Не часть ❌'}"
 
-    # ===== 777 (🎰 1-64) =====
     elif game_key == "slot":
         if choice_key == "777":
             win = result == 64
@@ -376,34 +429,6 @@ def check_win(game_key, choice_key, result):
             text = f"Выпало {result} → {'Любая ✅' if win else 'Пусто ❌'}"
 
     return win, text
-
-
-# ==================== BET ====================
-@dp.callback_query(F.data == "bet_up")
-async def bet_up(cb: types.CallbackQuery):
-    u = get_user(cb.from_user.id)
-    u["bet"] = min(round(u["bet"] + BET_STEP, 2), BET_MAX)
-    await cb.message.edit_text(menu_text(cb.from_user.id), reply_markup=main_menu(cb.from_user.id), parse_mode="HTML")
-    await cb.answer(f"Ставка: {u['bet']}$")
-
-
-@dp.callback_query(F.data == "bet_down")
-async def bet_down(cb: types.CallbackQuery):
-    u = get_user(cb.from_user.id)
-    u["bet"] = max(round(u["bet"] - BET_STEP, 2), BET_MIN)
-    await cb.message.edit_text(menu_text(cb.from_user.id), reply_markup=main_menu(cb.from_user.id), parse_mode="HTML")
-    await cb.answer(f"Ставка: {u['bet']}$")
-
-
-@dp.callback_query(F.data == "bet_set")
-async def bet_set(cb: types.CallbackQuery):
-    u = get_user(cb.from_user.id)
-    u["await_bet"] = True
-    await cb.message.answer(
-        f"✏️ <b>Введите сумму ставки</b>\n\nМин: <b>{BET_MIN}$</b>\nМакс: <b>{BET_MAX}$</b>",
-        parse_mode="HTML"
-    )
-    await cb.answer()
 
 
 # ==================== DEPOSIT ====================
@@ -469,7 +494,6 @@ async def cb_check(cb: types.CallbackQuery):
                 parse_mode="HTML"
             )
 
-            # ===== 10% РЕФЕРАЛ БОНУСЫ =====
             referrer_id = get_user(uid).get("ref")
             if referrer_id:
                 bonus = round(amount * REF_PERCENT, 2)
@@ -486,7 +510,6 @@ async def cb_check(cb: types.CallbackQuery):
                     )
                 except:
                     pass
-            # =============================
 
             try:
                 await bot.send_message(ADMIN_ID, f"💳 Пополнение: {uid} — {amount}$")
