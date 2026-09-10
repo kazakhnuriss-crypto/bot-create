@@ -321,7 +321,7 @@ def check_win(game_key, choice_key, result):
 
     # ===== ФУТБОЛ (⚽ 1-5) =====
     elif game_key == "football":
-        is_goal = result >= 4
+        is_goal = result >= 3
         if choice_key == "goal":
             win = is_goal
             text = f"Выпало {result} → {'ГОЛ ✅' if win else 'Промах ❌'}"
