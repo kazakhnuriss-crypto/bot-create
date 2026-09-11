@@ -16,7 +16,7 @@ CRYPTO_TOKEN = os.getenv("CRYPTO_TOKEN", "")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
 CHAT_LINK = os.getenv("CHAT_LINK", "")
 
-# ==================== СТАВКА ШЕКТЕУЛЕРІ ====================
+# ==================== ШЕКТЕУЛЕР ====================
 BET_MIN = 0.1
 BET_MAX = 10000.0
 WITHDRAW_MIN = 1.0
@@ -90,7 +90,7 @@ def get_user(uid):
             "refs": 0,
             "await_dep": False,
             "await_withdraw": False,
-            "pending_game": None,   # {game_key, choice_key, message}
+            "pending_game": None,
         }
     return users[uid]
 
@@ -228,7 +228,7 @@ async def cb_game(cb: types.CallbackQuery):
 async def cb_back(cb: types.CallbackQuery):
     uid = cb.from_user.id
     u = get_user(uid)
-    u["pending_game"] = None  # болдырмау
+    u["pending_game"] = None
     await cb.message.edit_text(menu_text(uid), reply_markup=main_menu(uid), parse_mode="HTML")
     await cb.answer()
 
@@ -272,9 +272,8 @@ async def cb_choice(cb: types.CallbackQuery):
     await cb.answer()
 
 
-# ==================== ОЙЫН ОЙНАУ ====================
+# ==================== ОЙЫН ====================
 async def play_game(message, uid, game_key, choice_key, bet):
-    """Ойын ойнау функциясы"""
     u = get_user(uid)
     g = GAMES[game_key]
     choice = g["choices"][choice_key]
@@ -530,7 +529,7 @@ async def cb_author(cb: types.CallbackQuery):
 
 # ==================== TEXT — сома енгізу ====================
 @dp.message(F.text.regexp(r"^\d+(\.\d+)?$"))
-async def set_bet_text(m: types.Message):
+async def set_number(m: types.Message):
     uid = m.from_user.id
     u = get_user(uid)
     val = float(m.text)
@@ -556,10 +555,7 @@ async def set_bet_text(m: types.Message):
             )
             return
 
-        # тазалаймыз
         u["pending_game"] = None
-
-        # ойынды бастаймыз
         await play_game(m, uid, game_key, choice_key, val)
         return
 
