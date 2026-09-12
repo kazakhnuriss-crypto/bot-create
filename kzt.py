@@ -10,7 +10,7 @@ from aiogram.types import (
 )
 from aiocryptopay import AioCryptoPay, Networks
 
-# ==================== ТОКЕНДЕР (Railway Variables) ====================
+# ==================== ТОКЕНДЕР ====================
 BOT_TOKEN = os.getenv("BOT_TOKEN", "")
 CRYPTO_TOKEN = os.getenv("CRYPTO_TOKEN", "")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
@@ -59,23 +59,41 @@ GAMES = {
             "miss": {"name": "Промах", "x": 2},
         }
     },
+    # ========== ДАРТС (жаңа дизайн) ==========
     "darts": {
-        "emoji": "🎯", "name": "Сектор", "choices": {
-            "center": {"name": "Прямо в центр", "x": 5},
-            "red":    {"name": "Красный сектор", "x": 2},
-            "white":  {"name": "Белый сектор", "x": 2},
-            "hit":    {"name": "Попадание", "x": 1.3},
-            "miss":   {"name": "Промах", "x": 3},
+        "emoji": "🎯", "name": "Сектор",
+        "rows": [
+            ["center", "red"],
+            ["bounce", "white"],
+            ["any_sector"],
+            ["red_or_center"],
+            ["white_or_bounce"],
+        ],
+        "choices": {
+            "center":          {"name": "🎯 Центр", "x": 6},
+            "red":             {"name": "🔴 Сектор", "x": 3},
+            "bounce":          {"name": "🎯 Отскок", "x": 6},
+            "white":           {"name": "⚪ Сектор", "x": 3},
+            "any_sector":      {"name": "Любой сектор", "x": 1.5},
+            "red_or_center":   {"name": "🔴 Сектор или Центр", "x": 2},
+            "white_or_bounce": {"name": "⚪ Сектор или Отскок", "x": 2},
         }
     },
+    # ========== БОУЛИНГ (жаңа дизайн) ==========
     "bowling": {
-        "emoji": "🎳", "name": "Боулинг", "choices": {
-            "p1": {"name": "Сбито 1/6", "x": 3},
-            "p2": {"name": "Сбито 2/6", "x": 3},
-            "p3": {"name": "Сбито 3/6", "x": 3},
-            "p4": {"name": "Сбито 4/6", "x": 3},
-            "p5": {"name": "Сбито 5/6", "x": 3},
-            "p6": {"name": "СТРАЙК 6/6", "x": 3},
+        "emoji": "🎳", "name": "Боулинг",
+        "rows": [
+            ["strike", "miss"],
+            ["p1", "p3"],
+            ["p4", "p5"],
+        ],
+        "choices": {
+            "strike": {"name": "🎳 Страйк", "x": 6},
+            "miss":   {"name": "🎳 Промах", "x": 6},
+            "p1":     {"name": "🎳 Сбито 1/6", "x": 6},
+            "p3":     {"name": "🎳 Сбито 3/6", "x": 6},
+            "p4":     {"name": "🎳 Сбито 4/6", "x": 6},
+            "p5":     {"name": "🎳 Сбито 5/6", "x": 6},
         }
     },
     "slot": {
@@ -92,6 +110,9 @@ def get_user(uid):
             "balance": 0.0,
             "ref": None,
             "refs": 0,
+            "total_bets": 0.0,
+            "games_played": 0,
+            "total_won": 0.0,
             "await_dep": False,
             "await_withdraw": False,
             "pending_game": None,
@@ -103,7 +124,7 @@ def bottom_menu():
     return ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text="💰 Баланс"), KeyboardButton(text="🎮 Играть")],
-            [KeyboardButton(text="☰ Меню")],
+            [KeyboardButton(text="☰ Меню"), KeyboardButton(text="🏆 Топ")],
         ],
         resize_keyboard=True
     )
@@ -149,11 +170,26 @@ def menu_text(uid):
 def game_menu(uid, game_key):
     g = GAMES[game_key]
     buttons = []
-    for choice_key, choice in g["choices"].items():
-        buttons.append([InlineKeyboardButton(
-            text=f"{choice['name']} — x{choice['x']}",
-            callback_data=f"choice_{game_key}_{choice_key}"
-        )])
+
+    if "rows" in g:
+        # Арнайы layout (2 баған)
+        for row in g["rows"]:
+            btn_row = []
+            for choice_key in row:
+                choice = g["choices"][choice_key]
+                btn_row.append(InlineKeyboardButton(
+                    text=f"{choice['name']} (x{choice['x']})",
+                    callback_data=f"choice_{game_key}_{choice_key}"
+                ))
+            buttons.append(btn_row)
+    else:
+        # Әдепкі (1 баған)
+        for choice_key, choice in g["choices"].items():
+            buttons.append([InlineKeyboardButton(
+                text=f"{choice['name']} (x{choice['x']})",
+                callback_data=f"choice_{game_key}_{choice_key}"
+            )])
+
     buttons.append([InlineKeyboardButton(text="⬅️ Назад", callback_data="back_menu")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
@@ -267,6 +303,9 @@ async def cb_admin_panel(cb: types.CallbackQuery):
         [InlineKeyboardButton(text="📊 Статистика", callback_data="admin_stats")],
         [InlineKeyboardButton(text="👥 Все пользователи", callback_data="admin_users")],
         [InlineKeyboardButton(text="📢 Рассылка", callback_data="admin_broadcast")],
+        [InlineKeyboardButton(text="🏆 Топ рефералов", callback_data="top_refs")],
+        [InlineKeyboardButton(text="💰 Топ по балансу", callback_data="top_balance")],
+        [InlineKeyboardButton(text="🎮 Топ игроков", callback_data="top_players")],
         [InlineKeyboardButton(text="⬅️ Назад", callback_data="back_menu")],
     ])
     await cb.message.answer(
@@ -300,11 +339,15 @@ async def cb_admin_stats(cb: types.CallbackQuery):
     total_users = len(users)
     total_balance = sum(u["balance"] for u in users.values())
     total_refs = sum(u["refs"] for u in users.values())
+    total_bets = sum(u.get("total_bets", 0) for u in users.values())
+    total_games = sum(u.get("games_played", 0) for u in users.values())
     await cb.message.answer(
         f"📊 <b>СТАТИСТИКА</b>\n\n"
         f"👥 Пользователей: <b>{total_users}</b>\n"
         f"💰 Общий баланс: <b>{round(total_balance, 2)}$</b>\n"
-        f"👥 Всего рефералов: <b>{total_refs}</b>",
+        f"👥 Всего рефералов: <b>{total_refs}</b>\n"
+        f"🎮 Всего игр: <b>{total_games}</b>\n"
+        f"💵 Всего ставок: <b>{round(total_bets, 2)}$</b>",
         parse_mode="HTML"
     )
     await cb.answer()
@@ -367,6 +410,47 @@ async def cmd_send(m: types.Message):
     )
 
 
+# ==================== ТОПТАР ====================
+@dp.callback_query(F.data == "top_refs")
+async def cb_top_refs(cb: types.CallbackQuery):
+    sorted_users = sorted(users.items(), key=lambda x: x[1].get("refs", 0), reverse=True)[:10]
+    text = "🏆 <b>ТОП РЕФЕРАЛОВ</b>\n\n"
+    count = 0
+    for i, (uid, u) in enumerate(sorted_users, 1):
+        if u.get("refs", 0) > 0:
+            count += 1
+            text += f"{i}. <code>{uid}</code> — 👥 {u['refs']}\n"
+    if count == 0:
+        text += "Пока никого нет"
+    await cb.message.answer(text, parse_mode="HTML")
+    await cb.answer()
+
+
+@dp.callback_query(F.data == "top_balance")
+async def cb_top_balance(cb: types.CallbackQuery):
+    sorted_users = sorted(users.items(), key=lambda x: x[1].get("balance", 0), reverse=True)[:10]
+    text = "💰 <b>ТОП ПО БАЛАНСУ</b>\n\n"
+    for i, (uid, u) in enumerate(sorted_users, 1):
+        if u.get("balance", 0) > 0:
+            text += f"{i}. <code>{uid}</code> — 💰 {round(u['balance'], 2)}$\n"
+    await cb.message.answer(text, parse_mode="HTML")
+    await cb.answer()
+
+
+@dp.callback_query(F.data == "top_players")
+async def cb_top_players(cb: types.CallbackQuery):
+    sorted_users = sorted(users.items(), key=lambda x: x[1].get("total_bets", 0), reverse=True)[:10]
+    text = "🎮 <b>ТОП ИГРОКОВ</b>\n\n"
+    for i, (uid, u) in enumerate(sorted_users, 1):
+        if u.get("total_bets", 0) > 0:
+            text += (
+                f"{i}. <code>{uid}</code>\n"
+                f"   🎮 {u.get('games_played', 0)} игр | 💵 {round(u['total_bets'], 2)}$\n"
+            )
+    await cb.message.answer(text, parse_mode="HTML")
+    await cb.answer()
+
+
 # ==================== REPLY BUTTONS ====================
 @dp.message(F.text == "💰 Баланс")
 async def btn_balance(m: types.Message):
@@ -379,11 +463,23 @@ async def btn_play(m: types.Message):
     await m.answer(menu_text(m.from_user.id), reply_markup=main_menu(m.from_user.id), parse_mode="HTML")
 
 
+@dp.message(F.text == "🏆 Топ")
+async def btn_top(m: types.Message):
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🏆 Топ рефералов", callback_data="top_refs")],
+        [InlineKeyboardButton(text="💰 Топ по балансу", callback_data="top_balance")],
+        [InlineKeyboardButton(text="🎮 Топ игроков", callback_data="top_players")],
+    ])
+    await m.answer("🏆 <b>Топы</b>\n\nВыберите категорию:", reply_markup=kb, parse_mode="HTML")
+
+
 @dp.message(F.text == "☰ Меню")
 async def btn_menu(m: types.Message):
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="👤 Профиль", callback_data="profile")],
         [InlineKeyboardButton(text="👥 Пригласить друга", callback_data="ref_link")],
+        [InlineKeyboardButton(text="🏆 Топ рефералов", callback_data="top_refs")],
+        [InlineKeyboardButton(text="💰 Топ по балансу", callback_data="top_balance")],
         [InlineKeyboardButton(text="💳 Пополнить", callback_data="deposit")],
         [InlineKeyboardButton(text="📤 Вывести", callback_data="withdraw")],
     ])
@@ -438,7 +534,7 @@ async def cb_choice(cb: types.CallbackQuery):
     await cb.answer()
 
 
-# ==================== ОЙЫН + КАНАЛ (FORWARD) ====================
+# ==================== ОЙЫН + КАНАЛ ====================
 async def play_game(message, uid, game_key, choice_key, bet):
     u = get_user(uid)
     g = GAMES[game_key]
@@ -470,9 +566,14 @@ async def play_game(message, uid, game_key, choice_key, bet):
     result = dice_msg.dice.value
     is_win, result_text = check_win(game_key, choice_key, result)
 
+    # Статистика
+    u["total_bets"] = round(u.get("total_bets", 0) + bet, 2)
+    u["games_played"] = u.get("games_played", 0) + 1
+
     if is_win:
         win = round(bet * choice["x"], 2)
         u["balance"] = round(u["balance"] - bet + win, 2)
+        u["total_won"] = round(u.get("total_won", 0) + win, 2)
         text = (
             f"🎉 <b>ПОБЕДА!</b>\n\n"
             f"{g['emoji']} {g['name']} — {choice['name']}\n"
@@ -564,20 +665,29 @@ def check_win(game_key, choice_key, result):
         elif choice_key == "white":
             win = result in [2, 3]
             text = f"Выпало {result} → {'Белый сектор ✅' if win else 'Не белый ❌'}"
-        elif choice_key == "hit":
-            win = result in [2, 3, 4, 5]
-            text = f"Выпало {result} → {'Попадание ✅' if win else 'Промах ❌'}"
-        elif choice_key == "miss":
+        elif choice_key == "bounce":
             win = result == 1
-            text = f"Выпало {result} → {'Промах ✅' if win else 'Попадание ❌'}"
+            text = f"Выпало {result} → {'Отскок ✅' if win else 'Не отскок ❌'}"
+        elif choice_key == "any_sector":
+            win = result in [2, 3, 4, 5]
+            text = f"Выпало {result} → {'Любой сектор ✅' if win else 'Не сектор ❌'}"
+        elif choice_key == "red_or_center":
+            win = result in [4, 5, 6]
+            text = f"Выпало {result} → {'Красный или Центр ✅' if win else 'НЕ ✅ ❌'}"
+        elif choice_key == "white_or_bounce":
+            win = result in [1, 2, 3]
+            text = f"Выпало {result} → {'Белый или Отскок ✅' if win else 'НЕ ✅ ❌'}"
 
     # ===== БОУЛИНГ =====
     elif game_key == "bowling":
-        if choice_key == "p1":
+        if choice_key == "strike":
+            win = result == 6
+            text = f"Результат {result} → {'СТРАЙК ✅' if win else 'Не страйк ❌'}"
+        elif choice_key == "miss":
             win = result == 1
-            text = f"Сбито {result}/6 → {'✅' if win else '❌'}"
-        elif choice_key == "p2":
-            win = result == 2
+            text = f"Результат {result} → {'Промах ✅' if win else 'Не промах ❌'}"
+        elif choice_key == "p1":
+            win = result == 1
             text = f"Сбито {result}/6 → {'✅' if win else '❌'}"
         elif choice_key == "p3":
             win = result == 3
@@ -588,9 +698,6 @@ def check_win(game_key, choice_key, result):
         elif choice_key == "p5":
             win = result == 5
             text = f"Сбито {result}/6 → {'✅' if win else '❌'}"
-        elif choice_key == "p6":
-            win = result == 6
-            text = f"СТРАЙК {result}/6 → {'✅' if win else '❌'}"
 
     # ===== 777 =====
     elif game_key == "slot":
@@ -716,7 +823,9 @@ async def cb_profile(cb: types.CallbackQuery):
         f"👤 <b>Профиль</b>\n\n"
         f"🆔 ID: <code>{cb.from_user.id}</code>\n"
         f"💰 Баланс: <b>{u['balance']}$</b>\n"
-        f"👥 Рефералов: <b>{u['refs']}</b>",
+        f"👥 Рефералов: <b>{u['refs']}</b>\n"
+        f"🎮 Игр: <b>{u.get('games_played', 0)}</b>\n"
+        f"💵 Ставок: <b>{round(u.get('total_bets', 0), 2)}$</b>",
         parse_mode="HTML"
     )
     await cb.answer()
