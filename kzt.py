@@ -38,8 +38,7 @@ except Exception as e:
     print("CryptoPay ҚАТЕ:", e)
     crypto = None
 
-# ==================== РОЗЫГРЫШТАР (жадыда) ====================
-# {gid: {"amount": 10, "min_dep": 3, "participants": [uid1, uid2], "active": True, "chat_id": ..., "msg_id": ...}}
+# ==================== РОЗЫГРЫШТАР ====================
 giveaways = {}
 next_gid = [1]
 
@@ -61,7 +60,6 @@ def db_init():
             total_deposit REAL DEFAULT 0
         )
     """)
-    # Ескі дерекқорларға total_deposit бағанын қосу
     try:
         cursor.execute("ALTER TABLE users ADD COLUMN total_deposit REAL DEFAULT 0")
         conn.commit()
@@ -77,7 +75,6 @@ def db_get_user(uid, username=None):
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM users WHERE uid = ?", (uid,))
     row = cursor.fetchone()
-
     if row is None:
         name = username or f"Player{uid % 10000}"
         cursor.execute("INSERT INTO users (uid, username) VALUES (?, ?)", (uid, name))
@@ -87,7 +84,6 @@ def db_get_user(uid, username=None):
     elif username:
         cursor.execute("UPDATE users SET username = ? WHERE uid = ?", (username, uid))
         conn.commit()
-
     conn.close()
     if row:
         return {
@@ -172,10 +168,6 @@ def get_user(uid, username=None):
     return db_get_user(uid, username)
 
 
-def get_display_name(uid, u):
-    return u.get("username", f"Player{uid % 10000}")
-
-
 def bottom_menu():
     return ReplyKeyboardMarkup(
         keyboard=[
@@ -209,18 +201,13 @@ def main_menu(uid):
         ],
     ]
     if uid == ADMIN_ID:
-        buttons.append([
-            InlineKeyboardButton(text="👑 АДМИН-ПАНЕЛЬ", callback_data="admin_panel")
-        ])
+        buttons.append([InlineKeyboardButton(text="👑 АДМИН-ПАНЕЛЬ", callback_data="admin_panel")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
 def menu_text(uid):
     u = get_user(uid)
-    return (
-        f"🎮 <b>Выберите игру, на которую хотите сделать ставку!</b>\n\n"
-        f"💵 Баланс: <b>{u['balance']}$</b>"
-    )
+    return f"🎮 <b>Выберите игру!</b>\n\n💵 Баланс: <b>{u['balance']}$</b>"
 
 
 def game_menu(uid, game_key):
@@ -252,7 +239,6 @@ async def cmd_start(m: types.Message):
     uid = m.from_user.id
     username = f"@{m.from_user.username}" if m.from_user.username else m.from_user.first_name
     u = get_user(uid, username)
-
     args = m.text.split()
     if len(args) > 1 and args[1].startswith("ref"):
         try:
@@ -267,26 +253,29 @@ async def cmd_start(m: types.Message):
                     pass
         except:
             pass
-
     await m.answer(menu_text(uid), reply_markup=main_menu(uid), parse_mode="HTML")
     await m.answer("Меню 👇", reply_markup=bottom_menu())
 
 
-# ==================== РОЗЫГРЫШ ====================
+# ==================== РОЗЫГРЫШ (жаңа формат) ====================
 @dp.message(Command("giveaway"))
 async def cmd_giveaway(m: types.Message):
-    """Админ розыгрыш жасайды: /giveaway <сома> <мин_депозит>"""
+    """
+    /giveaway [сумма] [мин_пополнение] [макс_участников]
+    Мысалы: /giveaway 10 3 50
+    """
     if m.from_user.id != ADMIN_ID:
         await m.answer("❌ У вас нет прав!")
         return
 
     args = m.text.split()
-    if len(args) < 3:
+    if len(args) < 4:
         await m.answer(
             "📋 <b>Использование:</b>\n\n"
-            "<code>/giveaway 10 3</code>\n\n"
+            "<code>/giveaway 10 3 50</code>\n\n"
             "• 10 — призовой фонд ($)\n"
-            "• 3 — минимальная сумма пополнений ($)",
+            "• 3 — минимальная сумма пополнений ($)\n"
+            "• 50 — максимум участников",
             parse_mode="HTML"
         )
         return
@@ -294,8 +283,13 @@ async def cmd_giveaway(m: types.Message):
     try:
         amount = float(args[1])
         min_dep = float(args[2])
+        max_participants = int(args[3])
     except:
         await m.answer("❌ Неверный формат")
+        return
+
+    if not CHANNEL_ID:
+        await m.answer("❌ CHANNEL_ID не настроен в Railway Variables!")
         return
 
     gid = next_gid[0]
@@ -304,80 +298,108 @@ async def cmd_giveaway(m: types.Message):
     giveaways[gid] = {
         "amount": amount,
         "min_dep": min_dep,
+        "max_participants": max_participants,
         "participants": [],
         "active": True,
+        "message_id": None,
+        "chat_id": CHANNEL_ID,
     }
 
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="🎁 Участвовать", callback_data=f"gjoin_{gid}")]
     ])
 
-    msg = await m.answer(
-        f"🎉 <b>РОЗЫГРЫШ!</b>\n\n"
-        f"💰 Призовой фонд: <b>{amount}$</b>\n"
-        f"📋 Минимум пополнений: <b>{min_dep}$</b>\n\n"
-        f"❗ Чтобы участвовать, у вас должно быть пополнений на сумму не менее <b>{min_dep}$</b>\n\n"
-        f"👇 Нажмите кнопку для участия:",
-        reply_markup=kb, parse_mode="HTML"
-    )
-
-    giveaways[gid]["chat_id"] = msg.chat.id
-    giveaways[gid]["msg_id"] = msg.message_id
-
-    if CHANNEL_ID:
-        try:
-            await bot.send_message(
-                CHANNEL_ID,
-                f"🎉 <b>РОЗЫГРЫШ!</b>\n\n"
-                f"💰 Призовой фонд: <b>{amount}$</b>\n"
-                f"📋 Минимум пополнений: <b>{min_dep}$</b>\n\n"
-                f"Участвуйте в боте!",
-                parse_mode="HTML"
-            )
-        except:
-            pass
+    # КАНАЛҒА ЖАРИЯЛАУ
+    try:
+        msg = await bot.send_message(
+            CHANNEL_ID,
+            f"🎉 <b>РОЗЫГРЫШ!</b>\n\n"
+            f"💰 Призовой фонд: <b>{amount}$</b>\n"
+            f"📋 Минимум пополнений: <b>{min_dep}$</b>\n"
+            f"👥 Максимум участников: <b>{max_participants}</b>\n\n"
+            f"❗ Для участия у вас должно быть пополнений на сумму не менее <b>{min_dep}$</b>\n\n"
+            f"👇 Нажмите кнопку для участия:",
+            reply_markup=kb, parse_mode="HTML"
+        )
+        giveaways[gid]["message_id"] = msg.message_id
+        await m.answer(f"✅ Розыгрыш #{gid} опубликован в канале!")
+    except Exception as e:
+        await m.answer(f"❌ Ошибка публикации в канал:\n<code>{e}</code>", parse_mode="HTML")
 
 
 @dp.callback_query(F.data.startswith("gjoin_"))
 async def cb_giveaway_join(cb: types.CallbackQuery):
     gid = int(cb.data.replace("gjoin_", ""))
+    uid = cb.from_user.id
+    username = f"@{cb.from_user.username}" if cb.from_user.username else cb.from_user.first_name
+
     if gid not in giveaways or not giveaways[gid]["active"]:
-        await cb.answer("❌ Розыгрыш завершён или не найден!")
+        await cb.answer("❌ Розыгрыш завершён!", show_alert=True)
         return
 
     g = giveaways[gid]
-    uid = cb.from_user.id
-    username = f"@{cb.from_user.username}" if cb.from_user.username else cb.from_user.first_name
-    u = get_user(uid, username)
 
-    # Тексеру: бұрын қатысқан ба?
+    # 1. Бұрын қатысқан ба?
     if uid in g["participants"]:
         await cb.answer("⚠️ Вы уже участвуете!", show_alert=True)
         return
 
-    # Тексеру: жеткілікті депозит бар ма?
+    # 2. Максимум участников?
+    if len(g["participants"]) >= g["max_participants"]:
+        await cb.answer(f"❌ Мест нет! Максимум: {g['max_participants']}", show_alert=True)
+        return
+
+    # 3. Депозит тексеру
+    u = get_user(uid, username)
     if u["total_deposit"] < g["min_dep"]:
         await cb.answer(
             f"❌ Недостаточно пополнений!\n\n"
             f"Нужно: {g['min_dep']}$\n"
-            f"У вас: {round(u['total_deposit'], 2)}$",
+            f"У вас: {round(u['total_deposit'], 2)}$\n\n"
+            f"💡 Пополните баланс в боте!",
             show_alert=True
         )
         return
 
-    # Қосу
+    # ҚОСУ
     g["participants"].append(uid)
-    await cb.answer("✅ Вы успешно участвуете! Удачи!", show_alert=True)
+    await cb.answer("✅ Вы участвуете! Удачи! 🍀", show_alert=True)
+
+    # Жеке хабарлама жіберу
+    try:
+        await bot.send_message(
+            uid,
+            f"🎉 <b>Вы участвуете в розыгрыше!</b>\n\n"
+            f"💰 Приз: <b>{g['amount']}$</b>\n"
+            f"👥 Участников: <b>{len(g['participants'])}/{g['max_participants']}</b>\n\n"
+            f"🍀 Удачи!",
+            parse_mode="HTML"
+        )
+    except:
+        pass
 
     # Админге хабарлау
     try:
         await bot.send_message(
             ADMIN_ID,
-            f"🎁 <b>Новый участник розыгрыша!</b>\n\n"
+            f"🎁 <b>Новый участник!</b>\n\n"
             f"👤 {username}\n"
             f"💰 Пополнений: {round(u['total_deposit'], 2)}$\n"
-            f"👥 Всего участников: {len(g['participants'])}",
+            f"👥 Всего: {len(g['participants'])}/{g['max_participants']}",
             parse_mode="HTML"
+        )
+    except:
+        pass
+
+    # Каналдағы хабарламаны жаңарту
+    try:
+        kb = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text=f"🎁 Участвовать ({len(g['participants'])}/{g['max_participants']})", callback_data=f"gjoin_{gid}")]
+        ])
+        await bot.edit_message_reply_markup(
+            chat_id=g["chat_id"],
+            message_id=g["message_id"],
+            reply_markup=kb
         )
     except:
         pass
@@ -385,14 +407,12 @@ async def cb_giveaway_join(cb: types.CallbackQuery):
 
 @dp.message(Command("endgiveaway"))
 async def cmd_endgiveaway(m: types.Message):
-    """Админ розыгрышты аяқтайды: /endgiveaway <gid>"""
     if m.from_user.id != ADMIN_ID:
         await m.answer("❌ У вас нет прав!")
         return
 
     args = m.text.split()
     if len(args) < 2:
-        # Егер gid көрсетілмесе — соңғы белсенді розыгрышты аяқтау
         active_gids = [gid for gid, g in giveaways.items() if g["active"]]
         if not active_gids:
             await m.answer("❌ Белсенді розыгрыш жоқ")
@@ -402,7 +422,7 @@ async def cmd_endgiveaway(m: types.Message):
         try:
             gid = int(args[1])
         except:
-            await m.answer("❌ Неверный формат: /endgiveaway <gid>")
+            await m.answer("❌ Формат: /endgiveaway <ID>")
             return
 
     if gid not in giveaways:
@@ -416,22 +436,20 @@ async def cmd_endgiveaway(m: types.Message):
 
     if not g["participants"]:
         g["active"] = False
-        await m.answer("❌ Никто не участвовал в розыгрыше")
+        await m.answer("❌ Никто не участвовал")
         return
 
-    # Кездейсоқ жеңімпаз
     winner_uid = random.choice(g["participants"])
     winner = get_user(winner_uid)
-    winner_name = get_display_name(winner_uid, winner)
+    winner_name = winner.get("username", f"Player{winner_uid % 10000}")
 
-    # Балансына қосу
     new_balance = round(winner["balance"] + g["amount"], 2)
     db_update_user(winner_uid, balance=new_balance)
 
     g["active"] = False
 
     await m.answer(
-        f"🎉 <b>РОЗЫГРЫШ ЗАВЕРШЁН!</b>\n\n"
+        f"🎉 <b>РОЗЫГРЫШ #{gid} ЗАВЕРШЁН!</b>\n\n"
         f"💰 Приз: <b>{g['amount']}$</b>\n"
         f"👥 Участников: <b>{len(g['participants'])}</b>\n\n"
         f"🏆 <b>ПОБЕДИТЕЛЬ: {winner_name}</b>\n"
@@ -439,12 +457,11 @@ async def cmd_endgiveaway(m: types.Message):
         parse_mode="HTML"
     )
 
-    # Жеңімпазға хабарлау
     try:
         await bot.send_message(
             winner_uid,
             f"🎉 <b>ПОЗДРАВЛЯЕМ!</b>\n\n"
-            f"🏆 Вы выиграли розыгрыш!\n"
+            f"🏆 Вы выиграли розыгрыш #{gid}!\n"
             f"💰 Приз: <b>+{g['amount']}$</b>\n"
             f"💵 Новый баланс: <b>{new_balance}$</b>",
             parse_mode="HTML"
@@ -452,12 +469,11 @@ async def cmd_endgiveaway(m: types.Message):
     except:
         pass
 
-    # Каналға жариялау
     if CHANNEL_ID:
         try:
             await bot.send_message(
                 CHANNEL_ID,
-                f"🎉 <b>РОЗЫГРЫШ ЗАВЕРШЁН!</b>\n\n"
+                f"🎉 <b>РОЗЫГРЫШ #{gid} ЗАВЕРШЁН!</b>\n\n"
                 f"💰 Приз: <b>{g['amount']}$</b>\n"
                 f"🏆 Победитель: <b>{winner_name}</b>\n\n"
                 f"🎊 Поздравляем!",
@@ -469,26 +485,24 @@ async def cmd_endgiveaway(m: types.Message):
 
 @dp.message(Command("giveaways"))
 async def cmd_giveaways(m: types.Message):
-    """Белсенді розыгрыштар тізімі"""
     if m.from_user.id != ADMIN_ID:
         await m.answer("❌ У вас нет прав!")
         return
 
     active = [(gid, g) for gid, g in giveaways.items() if g["active"]]
     if not active:
-        await m.answer("📭 Белсенді розыгрыштар жоқ")
+        await m.answer("📭 Активных розыгрышей нет")
         return
 
     text = "🎁 <b>АКТИВНЫЕ РОЗЫГРЫШИ</b>\n\n"
     for gid, g in active:
         text += (
-            f"<b>ID {gid}</b>\n"
+            f"<b>#{gid}</b>\n"
             f"💰 Приз: {g['amount']}$\n"
             f"📋 Мин. депозит: {g['min_dep']}$\n"
-            f"👥 Участников: {len(g['participants'])}\n\n"
+            f"👥 Участников: {len(g['participants'])}/{g['max_participants']}\n\n"
         )
-
-    text += "Аяқтау үшін: <code>/endgiveaway ID</code>"
+    text += "Аяқтау: <code>/endgiveaway ID</code>"
     await m.answer(text, parse_mode="HTML")
 
 
@@ -521,7 +535,7 @@ async def cmd_bonus(m: types.Message):
             parse_mode="HTML"
         )
         try:
-            await bot.send_message(target_uid, f"🎁 <b>Вам выдан бонус!</b>\n\n➕ <b>+{amount}$</b>\n💰 Баланс: <b>{new_bal}$</b>", parse_mode="HTML")
+            await bot.send_message(target_uid, f"🎁 <b>Вам выдан бонус!</b>\n\n➕ <b>+{amount}$</b>\n💰 {new_bal}$", parse_mode="HTML")
         except:
             pass
         return
@@ -553,7 +567,7 @@ async def cmd_bonus(m: types.Message):
     conn.close()
 
     if row is None:
-        await m.answer(f"❌ Пользователь <b>{target_username}</b> не найден!", parse_mode="HTML")
+        await m.answer(f"❌ <b>{target_username}</b> не найден!", parse_mode="HTML")
         return
 
     target_uid, target_name, target_balance = row
@@ -564,7 +578,7 @@ async def cmd_bonus(m: types.Message):
         parse_mode="HTML"
     )
     try:
-        await bot.send_message(target_uid, f"🎁 <b>Вам выдан бонус!</b>\n\n➕ <b>+{amount}$</b>\n💰 Баланс: <b>{new_balance}$</b>", parse_mode="HTML")
+        await bot.send_message(target_uid, f"🎁 <b>Вам выдан бонус!</b>\n\n➕ <b>+{amount}$</b>\n💰 {new_balance}$", parse_mode="HTML")
     except:
         pass
 
@@ -595,18 +609,18 @@ async def cb_admin_giveaways(cb: types.CallbackQuery):
     if cb.from_user.id != ADMIN_ID:
         await cb.answer("❌ Нет прав!")
         return
-    active = [(gid, g) for gid, g in giveaways.items() if g["active"]]
     text = "🎉 <b>РОЗЫГРЫШИ</b>\n\n"
+    active = [(gid, g) for gid, g in giveaways.items() if g["active"]]
     if not active:
-        text += "Активных розыгрышей нет\n\n"
+        text += "Активных нет\n\n"
     else:
         for gid, g in active:
-            text += f"<b>ID {gid}</b> — {g['amount']}$ | {len(g['participants'])} участников\n"
+            text += f"<b>#{gid}</b> — {g['amount']}$ | {len(g['participants'])}/{g['max_participants']}\n"
     text += (
         "\n<b>Команды:</b>\n"
-        "<code>/giveaway 10 3</code> — жасау\n"
-        "<code>/giveaways</code> — тізім\n"
-        "<code>/endgiveaway ID</code> — аяқтау"
+        "<code>/giveaway 10 3 50</code>\n"
+        "<code>/giveaways</code>\n"
+        "<code>/endgiveaway ID</code>"
     )
     await cb.message.answer(text, parse_mode="HTML")
     await cb.answer()
@@ -1020,7 +1034,7 @@ async def cb_check(cb: types.CallbackQuery):
             new_dep = round(u.get("total_deposit", 0) + amount, 2)
             db_update_user(uid, balance=new_balance, total_deposit=new_dep)
             await cb.message.answer(
-                f"✅ <b>Баланс пополнен!</b>\n➕ +{amount}$\n💰 {new_balance}$\n💳 Всего пополнений: {new_dep}$",
+                f"✅ <b>Пополнено!</b>\n➕ +{amount}$\n💰 {new_balance}$\n💳 Всего: {new_dep}$",
                 parse_mode="HTML"
             )
             referrer_id = u.get("ref")
@@ -1032,7 +1046,7 @@ async def cb_check(cb: types.CallbackQuery):
                 try:
                     await bot.send_message(
                         referrer_id,
-                        f"💸 <b>Реферальный бонус!</b>\n\n👤 {u.get('username', '?')} пополнил на <b>{amount}$</b>\n➕ Вам: <b>+{bonus}$</b>\n💰 {ref_new_balance}$",
+                        f"💸 <b>Реферальный бонус!</b>\n\n👤 Реферал пополнил на <b>{amount}$</b>\n➕ Вам: <b>+{bonus}$</b>\n💰 {ref_new_balance}$",
                         parse_mode="HTML"
                     )
                 except:
@@ -1054,7 +1068,7 @@ async def cb_withdraw(cb: types.CallbackQuery):
     uid = cb.from_user.id
     u = get_user(uid)
     if u["balance"] < WITHDRAW_MIN:
-        await cb.message.answer(f"❌ Минимум для вывода: {WITHDRAW_MIN}$\n💰 Баланс: {u['balance']}$", parse_mode="HTML")
+        await cb.message.answer(f"❌ Мин: {WITHDRAW_MIN}$\n💰 {u['balance']}$", parse_mode="HTML")
         await cb.answer()
         return
     session_state.setdefault(uid, {})
@@ -1118,7 +1132,7 @@ async def set_number(m: types.Message):
         if val < BET_MIN: await m.answer(f"❌ Мин: {BET_MIN}$"); return
         if val > BET_MAX: await m.answer(f"❌ Макс: {BET_MAX}$"); return
         if val > u["balance"]:
-            await m.answer(f"❌ Недостаточно средств! Нужно: {val}$\nУ вас: {u['balance']}$", parse_mode="HTML")
+            await m.answer(f"❌ Недостаточно! Нужно: {val}$\nУ вас: {u['balance']}$", parse_mode="HTML")
             return
         state["pending_game"] = None
         await play_game(m, uid, game_key, choice_key, val)
@@ -1134,7 +1148,7 @@ async def set_number(m: types.Message):
     if state.get("await_withdraw"):
         state["await_withdraw"] = False
         if val < WITHDRAW_MIN: await m.answer(f"❌ Мин: {WITHDRAW_MIN}$"); return
-        if val > u["balance"]: await m.answer(f"❌ Недостаточно! Баланс: {u['balance']}$"); return
+        if val > u["balance"]: await m.answer(f"❌ Баланс: {u['balance']}$"); return
         if crypto is None: await m.answer("❌ CryptoPay недоступен"); return
         await m.answer("⏳ Создаём чек...")
         try:
