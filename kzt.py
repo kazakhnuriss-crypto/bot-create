@@ -62,15 +62,20 @@ GAMES = {
     "darts": {
         "emoji": "🎯", "name": "Сектор", "choices": {
             "center": {"name": "Прямо в центр", "x": 5},
-            "hit":    {"name": "Попадание", "x": 2},
+            "red":    {"name": "Красный сектор", "x": 2},
+            "white":  {"name": "Белый сектор", "x": 2},
+            "hit":    {"name": "Попадание", "x": 1.3},
             "miss":   {"name": "Промах", "x": 3},
         }
     },
     "bowling": {
         "emoji": "🎳", "name": "Боулинг", "choices": {
-            "strike": {"name": "Страйк", "x": 2},
-            "miss":   {"name": "Промах", "x": 3},
-            "some":   {"name": "Часть сбита", "x": 2},
+            "p1": {"name": "Сбито 1/6", "x": 3},
+            "p2": {"name": "Сбито 2/6", "x": 3},
+            "p3": {"name": "Сбито 3/6", "x": 3},
+            "p4": {"name": "Сбито 4/6", "x": 3},
+            "p5": {"name": "Сбито 5/6", "x": 3},
+            "p6": {"name": "СТРАЙК 6/6", "x": 3},
         }
     },
     "slot": {
@@ -442,7 +447,6 @@ async def play_game(message, uid, game_key, choice_key, bet):
     user = message.from_user
     nick = f"@{user.username}" if user.username else user.first_name
 
-    # ===== КАНАЛҒА: ставка мәтіні =====
     if CHANNEL_ID:
         try:
             await bot.send_message(
@@ -454,11 +458,9 @@ async def play_game(message, uid, game_key, choice_key, bet):
         except Exception as e:
             print(f"Каналға ставка жіберу қатесі: {e}")
 
-    # ===== ОЙЫН: тек БОТТА бір дайс =====
     dice_msg = await message.answer_dice(emoji=g["emoji"])
     await asyncio.sleep(4)
 
-    # ===== КАНАЛҒА: ДӘЛ ОСЫ ДАЙСТІ FORWARD ету =====
     if CHANNEL_ID:
         try:
             await dice_msg.forward(chat_id=CHANNEL_ID)
@@ -504,10 +506,8 @@ async def play_game(message, uid, game_key, choice_key, bet):
             f"➖ Проигрыш: <b>-{bet}$</b>"
         )
 
-    # Ботта нәтиже
     await message.answer(text, parse_mode="HTML", reply_markup=main_menu(uid))
 
-    # Каналға нәтиже мәтіні
     if CHANNEL_ID:
         try:
             await bot.send_message(CHANNEL_ID, channel_text, parse_mode="HTML")
@@ -533,7 +533,7 @@ def check_win(game_key, choice_key, result):
             win = result % 2 == 1
             text = f"Выпало {result} → {'нечётное ✅' if win else 'Чётное ❌'}"
 
-    # ===== ФУТБОЛ (визуалға сәйкес) =====
+    # ===== ФУТБОЛ =====
     elif game_key == "football":
         is_goal = result >= 3
         if choice_key == "goal":
@@ -543,7 +543,7 @@ def check_win(game_key, choice_key, result):
             win = not is_goal
             text = f"Выпало {result} → {'Промах ✅' if win else 'ГОЛ ❌'}"
 
-    # ===== БАСКЕТБОЛ (визуалға сәйкес) =====
+    # ===== БАСКЕТБОЛ =====
     elif game_key == "basketball":
         is_goal = result >= 3
         if choice_key == "goal":
@@ -553,11 +553,17 @@ def check_win(game_key, choice_key, result):
             win = not is_goal
             text = f"Выпало {result} → {'Промах ✅' if win else 'ГОЛ ❌'}"
 
-    # ===== ДАРТС (визуалға сәйкес) =====
+    # ===== ДАРТС =====
     elif game_key == "darts":
         if choice_key == "center":
             win = result == 6
             text = f"Выпало {result} → {'ЦЕНТР ✅' if win else 'Не центр ❌'}"
+        elif choice_key == "red":
+            win = result in [4, 5]
+            text = f"Выпало {result} → {'Красный сектор ✅' if win else 'Не красный ❌'}"
+        elif choice_key == "white":
+            win = result in [2, 3]
+            text = f"Выпало {result} → {'Белый сектор ✅' if win else 'Не белый ❌'}"
         elif choice_key == "hit":
             win = result in [2, 3, 4, 5]
             text = f"Выпало {result} → {'Попадание ✅' if win else 'Промах ❌'}"
@@ -567,17 +573,26 @@ def check_win(game_key, choice_key, result):
 
     # ===== БОУЛИНГ =====
     elif game_key == "bowling":
-        if choice_key == "strike":
+        if choice_key == "p1":
+            win = result == 1
+            text = f"Сбито {result}/6 → {'✅' if win else '❌'}"
+        elif choice_key == "p2":
+            win = result == 2
+            text = f"Сбито {result}/6 → {'✅' if win else '❌'}"
+        elif choice_key == "p3":
+            win = result == 3
+            text = f"Сбито {result}/6 → {'✅' if win else '❌'}"
+        elif choice_key == "p4":
+            win = result == 4
+            text = f"Сбито {result}/6 → {'✅' if win else '❌'}"
+        elif choice_key == "p5":
+            win = result == 5
+            text = f"Сбито {result}/6 → {'✅' if win else '❌'}"
+        elif choice_key == "p6":
             win = result == 6
-            text = f"Выпало {result} → {'СТРАЙК ✅' if win else 'Не страйк ❌'}"
-        elif choice_key == "miss":
-            win = result <= 1
-            text = f"Выпало {result} → {'Промах ✅' if win else 'Не промах ❌'}"
-        elif choice_key == "some":
-            win = 2 <= result <= 5
-            text = f"Выпало {result} → {'Часть сбита ✅' if win else 'Не часть ❌'}"
+            text = f"СТРАЙК {result}/6 → {'✅' if win else '❌'}"
 
-    # ===== 777 (тек джекпот) =====
+    # ===== 777 =====
     elif game_key == "slot":
         if choice_key == "777":
             win = result == 64
