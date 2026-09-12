@@ -37,14 +37,14 @@ except Exception as e:
 
 users = {}
 
-# ==================== ОЙЫНДАР (бастапқы шанстар) ====================
+# ==================== ОЙЫНДАР ====================
 GAMES = {
     "dice": {
         "emoji": "🎲", "name": "Кости", "choices": {
-            "more3": {"name": "Больше ", "x": 2},
-            "less3": {"name": "Меньше ", "x": 3},
-            "even":  {"name": "Чётное ", "x": 2},
-            "odd":   {"name": "Нечётное ", "x": 2},
+            "more3": {"name": "Больше (4-6)", "x": 2},
+            "less3": {"name": "Меньше (1-3)", "x": 2},
+            "even":  {"name": "Чётное (2,4,6)", "x": 2},
+            "odd":   {"name": "Нечётное (1,3,5)", "x": 2},
         }
     },
     "football": {
@@ -77,7 +77,7 @@ GAMES = {
     "slot": {
         "emoji": "🎰", "name": "777", "choices": {
             "777": {"name": "777 (Джекпот)", "x": 10},
-            "any": {"name": "Любая комбинация", "x": 1.5},
+            "any": {"name": "Любая комбинация", "x": 2},
         }
     },
 }
@@ -444,7 +444,6 @@ async def play_game(message, uid, game_key, choice_key, bet):
     user = message.from_user
     nick = f"@{user.username}" if user.username else user.first_name
 
-    # КАНАЛҒА: СТАВКА
     if CHANNEL_ID:
         try:
             await bot.send_message(
@@ -457,7 +456,6 @@ async def play_game(message, uid, game_key, choice_key, bet):
         except Exception as e:
             print(f"Каналға жіберу қатесі: {e}")
 
-    # ОЙЫН
     dice_msg = await message.answer_dice(emoji=g["emoji"])
     await asyncio.sleep(4)
     result = dice_msg.dice.value
@@ -502,7 +500,6 @@ async def play_game(message, uid, game_key, choice_key, bet):
 
     await message.answer(text, parse_mode="HTML", reply_markup=main_menu(uid))
 
-    # КАНАЛҒА: НӘТИЖЕ
     if CHANNEL_ID:
         try:
             await bot.send_message(CHANNEL_ID, channel_text, parse_mode="HTML")
@@ -513,13 +510,13 @@ async def play_game(message, uid, game_key, choice_key, bet):
 def check_win(game_key, choice_key, result):
     text, win = "", False
 
-    # ===== КОСТИ (бастапқы шанстар) =====
+    # ===== КОСТИ =====
     if game_key == "dice":
         if choice_key == "more3":
             win = result >= 4
             text = f"Выпало {result} → {'больше 3 ✅' if win else 'НЕ больше 3 ❌'}"
         elif choice_key == "less3":
-            win = result <= 2
+            win = result <= 3
             text = f"Выпало {result} → {'меньше 3 ✅' if win else 'НЕ меньше 3 ❌'}"
         elif choice_key == "even":
             win = result % 2 == 0
