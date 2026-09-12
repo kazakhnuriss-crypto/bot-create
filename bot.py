@@ -15,6 +15,7 @@ BOT_TOKEN = os.getenv("BOT_TOKEN", "")
 CRYPTO_TOKEN = os.getenv("CRYPTO_TOKEN", "")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
 CHAT_LINK = os.getenv("CHAT_LINK", "")
+CHANNEL_ID = int(os.getenv("CHANNEL_ID", "0"))
 
 # ==================== ШЕКТЕУЛЕР ====================
 BET_MIN = 0.1
@@ -40,10 +41,10 @@ users = {}
 GAMES = {
     "dice": {
         "emoji": "🎲", "name": "Кости", "choices": {
-            "more3": {"name": "Больше (4-6)", "x": 2},
-            "less3": {"name": "Меньше (1-2)", "x": 3},
-            "even":  {"name": "Чётное (2,4,6)", "x": 2},
-            "odd":   {"name": "Нечётное (1,3,5)", "x": 2},
+            "more3": {"name": "Больше (5-6)", "x": 2},
+            "less3": {"name": "Меньше (1)", "x": 3},
+            "even":  {"name": "Чётное (2,6)", "x": 2},
+            "odd":   {"name": "Нечётное (1,5)", "x": 2},
         }
     },
     "football": {
@@ -106,7 +107,6 @@ def bottom_menu():
 
 
 def main_menu(uid):
-    u = get_user(uid)
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [
             InlineKeyboardButton(text="🎲 Кости", callback_data="game_dice"),
@@ -165,36 +165,105 @@ async def cmd_start(m: types.Message):
                     u["ref"] = ref_id
                     get_user(ref_id)["refs"] += 1
                     try:
-                        await bot.send_message(
-                            ref_id,
-                            "🎉 <b>Новый реферал!</b>\n\n"
-                            "Теперь вы получаете <b>10%</b> "
-                            "с каждого его пополнения!",
-                            parse_mode="HTML"
-                        )
+                        await bot.send_message(ref_id, "🎉 Новый реферал! +10% с пополнений")
                     except:
                         pass
         except:
             pass
-    u = get_user(uid)
     await m.answer(menu_text(uid), reply_markup=main_menu(uid), parse_mode="HTML")
     await m.answer("Меню 👇", reply_markup=bottom_menu())
+
+
+# ==================== АДМИН БОНУС ====================
+@dp.message(Command("bonus"))
+async def cmd_bonus(m: types.Message):
+    if m.from_user.id != ADMIN_ID:
+        await m.answer("❌ У вас нет прав!")
+        return
+
+    args = m.text.split()
+
+    # Reply арқылы
+    if m.reply_to_message:
+        if len(args) < 2:
+            await m.answer("❌ Использование: <code>/bonus 10</code> (ответом)", parse_mode="HTML")
+            return
+        try:
+            amount = float(args[1])
+        except:
+            await m.answer("❌ Неверная сумма")
+            return
+
+        target_uid = m.reply_to_message.from_user.id
+        get_user(target_uid)["balance"] = round(get_user(target_uid)["balance"] + amount, 2)
+
+        await m.answer(
+            f"✅ <b>Бонус выдан!</b>\n\n"
+            f"👤 User: <code>{target_uid}</code>\n"
+            f"➕ Сумма: <b>+{amount}$</b>\n"
+            f"💰 Баланс: <b>{get_user(target_uid)['balance']}$</b>",
+            parse_mode="HTML"
+        )
+        try:
+            await bot.send_message(
+                target_uid,
+                f"🎁 <b>Вам выдан бонус!</b>\n\n"
+                f"➕ <b>+{amount}$</b>\n"
+                f"💰 Баланс: <b>{get_user(target_uid)['balance']}$</b>",
+                parse_mode="HTML"
+            )
+        except:
+            pass
+        return
+
+    # ID арқылы
+    if len(args) < 3:
+        await m.answer(
+            "📋 <b>Использование:</b>\n\n"
+            "1️⃣ Ответом: <code>/bonus 10</code>\n"
+            "2️⃣ По ID: <code>/bonus 123456789 10</code>",
+            parse_mode="HTML"
+        )
+        return
+
+    try:
+        target_uid = int(args[1])
+        amount = float(args[2])
+    except:
+        await m.answer("❌ Неверный формат")
+        return
+
+    get_user(target_uid)["balance"] = round(get_user(target_uid)["balance"] + amount, 2)
+
+    await m.answer(
+        f"✅ <b>Бонус выдан!</b>\n\n"
+        f"👤 User: <code>{target_uid}</code>\n"
+        f"➕ Сумма: <b>+{amount}$</b>\n"
+        f"💰 Баланс: <b>{get_user(target_uid)['balance']}$</b>",
+        parse_mode="HTML"
+    )
+    try:
+        await bot.send_message(
+            target_uid,
+            f"🎁 <b>Вам выдан бонус!</b>\n\n"
+            f"➕ <b>+{amount}$</b>\n"
+            f"💰 Баланс: <b>{get_user(target_uid)['balance']}$</b>",
+            parse_mode="HTML"
+        )
+    except:
+        pass
 
 
 # ==================== REPLY BUTTONS ====================
 @dp.message(F.text == "💰 Баланс")
 async def btn_balance(m: types.Message):
     u = get_user(m.from_user.id)
-    await m.answer(
-        f"💰 <b>Ваш баланс:</b> {u['balance']}$\n👥 Рефералов: {u['refs']}",
-        parse_mode="HTML"
-    )
+    await m.answer(f"💰 <b>Ваш баланс:</b> {u['balance']}$\n👥 Рефералов: {u['refs']}", parse_mode="HTML")
 
 
 @dp.message(F.text == "🎮 Играть")
 async def btn_play(m: types.Message):
-    uid = m.from_user.id
-    await m.answer(menu_text(uid), reply_markup=main_menu(uid), parse_mode="HTML")
+    await m.answer(menu_text(m.from_user.id), reply_markup=main_menu(m.from_user.id), parse_mode="HTML")
 
 
 @dp.message(F.text == "☰ Меню")
@@ -226,58 +295,60 @@ async def cb_game(cb: types.CallbackQuery):
 
 @dp.callback_query(F.data == "back_menu")
 async def cb_back(cb: types.CallbackQuery):
-    uid = cb.from_user.id
-    u = get_user(uid)
+    u = get_user(cb.from_user.id)
     u["pending_game"] = None
-    await cb.message.edit_text(menu_text(uid), reply_markup=main_menu(uid), parse_mode="HTML")
+    await cb.message.edit_text(menu_text(cb.from_user.id), reply_markup=main_menu(cb.from_user.id), parse_mode="HTML")
     await cb.answer()
 
 
-# ==================== CHOICE → сұраймыз соманы ====================
 @dp.callback_query(F.data.startswith("choice_"))
 async def cb_choice(cb: types.CallbackQuery):
     parts = cb.data.split("_")
     if len(parts) < 3:
         await cb.answer("Ошибка!")
         return
-    game_key = parts[1]
-    choice_key = parts[2]
-
-    if game_key not in GAMES:
+    game_key, choice_key = parts[1], parts[2]
+    if game_key not in GAMES or choice_key not in GAMES[game_key]["choices"]:
         await cb.answer("Ошибка!")
         return
-    g = GAMES[game_key]
-    if choice_key not in g["choices"]:
-        await cb.answer("Ошибка!")
-        return
-
-    choice = g["choices"][choice_key]
-    uid = cb.from_user.id
-    u = get_user(uid)
-    u["pending_game"] = {
-        "game_key": game_key,
-        "choice_key": choice_key,
-    }
-
+    choice = GAMES[game_key]["choices"][choice_key]
+    u = get_user(cb.from_user.id)
+    u["pending_game"] = {"game_key": game_key, "choice_key": choice_key}
     await cb.message.answer(
-        f"{g['emoji']} <b>{g['name']} — {choice['name']}</b>\n"
+        f"{GAMES[game_key]['emoji']} <b>{GAMES[game_key]['name']} — {choice['name']}</b>\n"
         f"Коэффициент: <b>x{choice['x']}</b>\n\n"
         f"💵 Ваш баланс: <b>{u['balance']}$</b>\n\n"
         f"✏️ <b>Введите сумму ставки:</b>\n"
-        f"Мин: <b>{BET_MIN}$</b>\n"
-        f"Макс: <b>{BET_MAX}$</b>\n\n"
-        f"Например: <code>5</code> или <code>150.5</code>",
+        f"Мин: <b>{BET_MIN}$</b>\nМакс: <b>{BET_MAX}$</b>",
         parse_mode="HTML"
     )
     await cb.answer()
 
 
-# ==================== ОЙЫН ====================
+# ==================== ОЙЫН + КАНАЛҒА ЖАРИЯЛАУ ====================
 async def play_game(message, uid, game_key, choice_key, bet):
     u = get_user(uid)
     g = GAMES[game_key]
     choice = g["choices"][choice_key]
 
+    # Пайдаланушы аты
+    user = message.from_user
+    nick = f"@{user.username}" if user.username else user.first_name
+
+    # ===== КАНАЛҒА: ОЙЫН БАСТАЛДЫ =====
+    if CHANNEL_ID:
+        try:
+            await bot.send_message(
+                CHANNEL_ID,
+                f"🎰 <b>{nick}</b> поставил <b>{bet}$</b>\n"
+                f"на <b>{g['name']} — {choice['name']}</b> (x{choice['x']})",
+                parse_mode="HTML"
+            )
+            await bot.send_dice(chat_id=CHANNEL_ID, emoji=g["emoji"])
+        except Exception as e:
+            print(f"Каналға жіберу қатесі: {e}")
+
+    # ===== ОЙЫН =====
     dice_msg = await message.answer_dice(emoji=g["emoji"])
     await asyncio.sleep(4)
     result = dice_msg.dice.value
@@ -294,6 +365,14 @@ async def play_game(message, uid, game_key, choice_key, bet):
             f"➕ Выигрыш: <b>+{win}$</b>\n"
             f"💰 Баланс: <b>{u['balance']}$</b>"
         )
+        channel_text = (
+            f"✅ <b>ВЫИГРЫШ!</b>\n\n"
+            f"👤 <b>{nick}</b>\n"
+            f"🎮 {g['emoji']} {g['name']} — {choice['name']}\n"
+            f"🎲 Результат: <b>{result}</b>\n"
+            f"💵 Ставка: <b>{bet}$</b>\n"
+            f"➕ Выигрыш: <b>+{win}$</b> (x{choice['x']})"
+        )
     else:
         u["balance"] = round(u["balance"] - bet, 2)
         text = (
@@ -303,27 +382,41 @@ async def play_game(message, uid, game_key, choice_key, bet):
             f"➖ Проигрыш: <b>-{bet}$</b>\n"
             f"💰 Баланс: <b>{u['balance']}$</b>"
         )
+        channel_text = (
+            f"❌ <b>ПРОИГРЫШ</b>\n\n"
+            f"👤 <b>{nick}</b>\n"
+            f"🎮 {g['emoji']} {g['name']} — {choice['name']}\n"
+            f"🎲 Результат: <b>{result}</b>\n"
+            f"💵 Ставка: <b>{bet}$</b>\n"
+            f"➖ Проигрыш: <b>-{bet}$</b>"
+        )
+
+    # Пайдаланушыға
     await message.answer(text, parse_mode="HTML", reply_markup=main_menu(uid))
+
+    # ===== КАНАЛҒА: НӘТИЖЕ =====
+    if CHANNEL_ID:
+        try:
+            await bot.send_message(CHANNEL_ID, channel_text, parse_mode="HTML")
+        except Exception as e:
+            print(f"Каналға нәтиже жіберу қатесі: {e}")
 
 
 def check_win(game_key, choice_key, result):
-    text = ""
-    win = False
-
+    text, win = "", False
     if game_key == "dice":
         if choice_key == "more3":
-            win = result >= 4
+            win = result >= 5
             text = f"Выпало {result} → {'больше 3 ✅' if win else 'НЕ больше 3 ❌'}"
         elif choice_key == "less3":
-            win = result <= 2
+            win = result == 1
             text = f"Выпало {result} → {'меньше 3 ✅' if win else 'НЕ меньше 3 ❌'}"
         elif choice_key == "even":
-            win = result % 2 == 0
+            win = result in [2, 6]
             text = f"Выпало {result} → {'чётное ✅' if win else 'НЕчётное ❌'}"
         elif choice_key == "odd":
-            win = result % 2 == 1
+            win = result in [1, 5]
             text = f"Выпало {result} → {'нечётное ✅' if win else 'Чётное ❌'}"
-
     elif game_key == "football":
         is_goal = result >= 4
         if choice_key == "goal":
@@ -332,7 +425,6 @@ def check_win(game_key, choice_key, result):
         elif choice_key == "miss":
             win = not is_goal
             text = f"Выпало {result} → {'Промах ✅' if win else 'ГОЛ ❌'}"
-
     elif game_key == "basketball":
         is_goal = result >= 4
         if choice_key == "goal":
@@ -341,7 +433,6 @@ def check_win(game_key, choice_key, result):
         elif choice_key == "miss":
             win = not is_goal
             text = f"Выпало {result} → {'Промах ✅' if win else 'ГОЛ ❌'}"
-
     elif game_key == "darts":
         if choice_key == "center":
             win = result == 6
@@ -355,7 +446,6 @@ def check_win(game_key, choice_key, result):
         elif choice_key == "bounce":
             win = result in [1, 2]
             text = f"Выпало {result} → {'Отскок ✅' if win else 'Не отскок ❌'}"
-
     elif game_key == "bowling":
         if choice_key == "strike":
             win = result == 6
@@ -366,7 +456,6 @@ def check_win(game_key, choice_key, result):
         elif choice_key == "some":
             win = 2 <= result <= 5
             text = f"Выпало {result} → {'Часть сбита ✅' if win else 'Не часть ❌'}"
-
     elif game_key == "slot":
         if choice_key == "777":
             win = result == 64
@@ -374,7 +463,6 @@ def check_win(game_key, choice_key, result):
         elif choice_key == "any":
             win = result >= 1
             text = f"Выпало {result} → {'Любая ✅' if win else 'Пусто ❌'}"
-
     return win, text
 
 
@@ -395,13 +483,11 @@ async def cb_deposit(cb: types.CallbackQuery):
 async def cb_dep_amount(cb: types.CallbackQuery):
     data = cb.data.replace("dep_", "")
     if data == "custom":
-        u = get_user(cb.from_user.id)
-        u["await_dep"] = True
+        get_user(cb.from_user.id)["await_dep"] = True
         await cb.message.answer("✏️ Введите сумму (1-10000$):")
         await cb.answer()
         return
-    amount = float(data)
-    await create_deposit_invoice(cb.message, cb.from_user.id, amount)
+    await create_deposit_invoice(cb.message, cb.from_user.id, float(data))
     await cb.answer()
 
 
@@ -427,9 +513,7 @@ async def create_deposit_invoice(message, uid, amount):
 @dp.callback_query(F.data.startswith("check_"))
 async def cb_check(cb: types.CallbackQuery):
     parts = cb.data.split("_")
-    invoice_id = int(parts[1])
-    amount = float(parts[2])
-    uid = cb.from_user.id
+    invoice_id, amount, uid = int(parts[1]), float(parts[2]), cb.from_user.id
     try:
         inv = await crypto.get_invoices(invoice_ids=invoice_id)
         if isinstance(inv, list):
@@ -440,7 +524,6 @@ async def cb_check(cb: types.CallbackQuery):
                 f"✅ <b>Баланс пополнен!</b>\n➕ +{amount}$\n💰 Баланс: {get_user(uid)['balance']}$",
                 parse_mode="HTML"
             )
-
             referrer_id = get_user(uid).get("ref")
             if referrer_id:
                 bonus = round(amount * REF_PERCENT, 2)
@@ -450,14 +533,13 @@ async def cb_check(cb: types.CallbackQuery):
                     await bot.send_message(
                         referrer_id,
                         f"💸 <b>Реферальный бонус!</b>\n\n"
-                        f"👤 Ваш реферал пополнил на <b>{amount}$</b>\n"
-                        f"➕ Вам начислено: <b>+{bonus}$</b> (10%)\n"
-                        f"💰 Ваш баланс: <b>{ref_user['balance']}$</b>",
+                        f"👤 Реферал пополнил на <b>{amount}$</b>\n"
+                        f"➕ Вам: <b>+{bonus}$</b> (10%)\n"
+                        f"💰 Баланс: <b>{ref_user['balance']}$</b>",
                         parse_mode="HTML"
                     )
                 except:
                     pass
-
             try:
                 await bot.send_message(ADMIN_ID, f"💳 Пополнение: {uid} — {amount}$")
             except:
@@ -475,7 +557,7 @@ async def cb_withdraw(cb: types.CallbackQuery):
     u = get_user(cb.from_user.id)
     if u["balance"] < WITHDRAW_MIN:
         await cb.message.answer(
-            f"❌ <b>Минимум для вывода: {WITHDRAW_MIN}$</b>\n\n💰 Баланс: <b>{u['balance']}$</b>",
+            f"❌ <b>Минимум для вывода: {WITHDRAW_MIN}$</b>\n💰 Баланс: <b>{u['balance']}$</b>",
             parse_mode="HTML"
         )
         await cb.answer()
@@ -483,10 +565,9 @@ async def cb_withdraw(cb: types.CallbackQuery):
     u["await_withdraw"] = True
     await cb.message.answer(
         f"📤 <b>Вывод средств</b>\n\n"
-        f"💰 Ваш баланс: <b>{u['balance']}$</b>\n"
-        f"Мин: <b>{WITHDRAW_MIN}$</b>\n"
-        f"Макс: <b>{u['balance']}$</b>\n\n"
-        f"✏️ Введите сумму для вывода:\nНапример: <code>5</code>",
+        f"💰 Баланс: <b>{u['balance']}$</b>\n"
+        f"Мин: <b>{WITHDRAW_MIN}$</b>\nМакс: <b>{u['balance']}$</b>\n\n"
+        f"✏️ Введите сумму для вывода:",
         parse_mode="HTML"
     )
     await cb.answer()
@@ -514,7 +595,6 @@ async def cb_ref(cb: types.CallbackQuery):
     await cb.message.answer(
         f"👥 <b>Пригласите друга и получайте 10% с каждого его пополнения!</b>\n\n"
         f"🔗 Ваша ссылка:\n<code>{link}</code>\n\n"
-        f"💰 Пример: друг пополнил 10$ → вы получаете <b>+1$</b>\n"
         f"👥 Ваших рефералов: <b>{u['refs']}</b>",
         parse_mode="HTML"
     )
@@ -527,19 +607,16 @@ async def cb_author(cb: types.CallbackQuery):
     await cb.answer()
 
 
-# ==================== TEXT — сома енгізу ====================
+# ==================== TEXT ====================
 @dp.message(F.text.regexp(r"^\d+(\.\d+)?$"))
 async def set_number(m: types.Message):
     uid = m.from_user.id
     u = get_user(uid)
     val = float(m.text)
 
-    # ===== ОЙЫН СТАВКАСЫ =====
     if u.get("pending_game"):
         pg = u["pending_game"]
-        game_key = pg["game_key"]
-        choice_key = pg["choice_key"]
-
+        game_key, choice_key = pg["game_key"], pg["choice_key"]
         if val < BET_MIN:
             await m.answer(f"❌ Минимальная ставка: {BET_MIN}$")
             return
@@ -548,18 +625,14 @@ async def set_number(m: types.Message):
             return
         if val > u["balance"]:
             await m.answer(
-                f"❌ <b>Недостаточно средств!</b>\n\n"
-                f"Нужно: <b>{val}$</b>\n"
-                f"У вас: <b>{u['balance']}$</b>",
+                f"❌ <b>Недостаточно средств!</b>\n\nНужно: <b>{val}$</b>\nУ вас: <b>{u['balance']}$</b>",
                 parse_mode="HTML"
             )
             return
-
         u["pending_game"] = None
         await play_game(m, uid, game_key, choice_key, val)
         return
 
-    # ===== ПОПОЛНЕНИЕ =====
     if u.get("await_dep"):
         if val < 1:
             await m.answer("❌ Мин: 1$")
@@ -571,34 +644,24 @@ async def set_number(m: types.Message):
         await create_deposit_invoice(m, uid, val)
         return
 
-    # ===== ВЫВОД =====
     if u.get("await_withdraw"):
         u["await_withdraw"] = False
-
         if val < WITHDRAW_MIN:
             await m.answer(f"❌ Минимум: {WITHDRAW_MIN}$")
             return
-
         if val > u["balance"]:
             await m.answer(
-                f"❌ Недостаточно средств!\n\n"
-                f"Запрошено: <b>{val}$</b>\n"
-                f"Баланс: <b>{u['balance']}$</b>",
+                f"❌ Недостаточно средств!\n\nЗапрошено: <b>{val}$</b>\nБаланс: <b>{u['balance']}$</b>",
                 parse_mode="HTML"
             )
             return
-
         if crypto is None:
             await m.answer("❌ CryptoPay недоступен")
             return
-
         await m.answer("⏳ Создаём чек...")
-
         try:
             check = await crypto.create_check(
-                asset="USDT",
-                amount=round(val, 2),
-                pin_to_user_id=uid,
+                asset="USDT", amount=round(val, 2), pin_to_user_id=uid
             )
             u["balance"] = round(u["balance"] - val, 2)
             kb = InlineKeyboardMarkup(inline_keyboard=[
@@ -608,8 +671,7 @@ async def set_number(m: types.Message):
                 f"✅ <b>Чек на вывод создан!</b>\n\n"
                 f"💰 Сумма: <b>{val}$</b>\n"
                 f"💵 Баланс: <b>{u['balance']}$</b>\n\n"
-                f"🎁 Активируйте чек 👇\n"
-                f"⚠️ Чек привязан к вашему аккаунту.",
+                f"🎁 Активируйте чек 👇",
                 reply_markup=kb, parse_mode="HTML"
             )
             try:
@@ -621,10 +683,7 @@ async def set_number(m: types.Message):
             except:
                 pass
         except Exception as e:
-            await m.answer(
-                f"❌ <b>Ошибка вывода:</b>\n<code>{e}</code>\n\nНапишите: @admin",
-                parse_mode="HTML"
-            )
+            await m.answer(f"❌ <b>Ошибка вывода:</b>\n<code>{e}</code>", parse_mode="HTML")
         return
 
 
@@ -634,6 +693,7 @@ async def main():
     print("🤖 Бот запущен!")
     me = await bot.get_me()
     print("Бот:", me.username)
+    print("Канал:", CHANNEL_ID)
     print("=" * 40)
     await dp.start_polling(bot)
 
