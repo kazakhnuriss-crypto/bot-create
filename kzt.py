@@ -435,7 +435,7 @@ async def cb_choice(cb: types.CallbackQuery):
     await cb.answer()
 
 
-# ==================== ОЙЫН + КАНАЛ ====================
+# ==================== ОЙЫН + КАНАЛ (FORWARD) ====================
 async def play_game(message, uid, game_key, choice_key, bet):
     u = get_user(uid)
     g = GAMES[game_key]
@@ -444,6 +444,7 @@ async def play_game(message, uid, game_key, choice_key, bet):
     user = message.from_user
     nick = f"@{user.username}" if user.username else user.first_name
 
+    # ===== КАНАЛҒА: ставка мәтіні =====
     if CHANNEL_ID:
         try:
             await bot.send_message(
@@ -452,14 +453,21 @@ async def play_game(message, uid, game_key, choice_key, bet):
                 f"на <b>{g['name']} — {choice['name']}</b> (x{choice['x']})",
                 parse_mode="HTML"
             )
-            await bot.send_dice(chat_id=CHANNEL_ID, emoji=g["emoji"])
         except Exception as e:
-            print(f"Каналға жіберу қатесі: {e}")
+            print(f"Каналға ставка жіберу қатесі: {e}")
 
+    # ===== ОЙЫН: тек БОТТА бір дайс =====
     dice_msg = await message.answer_dice(emoji=g["emoji"])
     await asyncio.sleep(4)
-    result = dice_msg.dice.value
 
+    # ===== КАНАЛҒА: ДӘЛ ОСЫ ДАЙСТІ FORWARD ету =====
+    if CHANNEL_ID:
+        try:
+            await dice_msg.forward(chat_id=CHANNEL_ID)
+        except Exception as e:
+            print(f"Каналға дайс forward қатесі: {e}")
+
+    result = dice_msg.dice.value
     is_win, result_text = check_win(game_key, choice_key, result)
 
     if is_win:
@@ -498,8 +506,10 @@ async def play_game(message, uid, game_key, choice_key, bet):
             f"➖ Проигрыш: <b>-{bet}$</b>"
         )
 
+    # Ботта нәтиже
     await message.answer(text, parse_mode="HTML", reply_markup=main_menu(uid))
 
+    # Каналға нәтиже мәтіні
     if CHANNEL_ID:
         try:
             await bot.send_message(CHANNEL_ID, channel_text, parse_mode="HTML")
@@ -510,7 +520,6 @@ async def play_game(message, uid, game_key, choice_key, bet):
 def check_win(game_key, choice_key, result):
     text, win = "", False
 
-    # ===== КОСТИ =====
     if game_key == "dice":
         if choice_key == "more3":
             win = result >= 4
