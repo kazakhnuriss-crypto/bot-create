@@ -36,6 +36,9 @@ except Exception as e:
     crypto = None
 
 users = {}
+# {uid: "username"} — username-нен uid-ке
+username_index = {}
+
 
 # ==================== ОЙЫНДАР ====================
 GAMES = {
@@ -59,7 +62,6 @@ GAMES = {
             "miss": {"name": "Промах", "x": 2},
         }
     },
-    # ========== ДАРТС (жаңа дизайн) ==========
     "darts": {
         "emoji": "🎯", "name": "Сектор",
         "rows": [
@@ -79,7 +81,6 @@ GAMES = {
             "white_or_bounce": {"name": "⚪ Сектор или Отскок", "x": 2},
         }
     },
-    # ========== БОУЛИНГ (жаңа дизайн) ==========
     "bowling": {
         "emoji": "🎳", "name": "Боулинг",
         "rows": [
@@ -104,10 +105,11 @@ GAMES = {
 }
 
 
-def get_user(uid):
+def get_user(uid, username=None):
     if uid not in users:
         users[uid] = {
             "balance": 0.0,
+            "username": username or f"Player{uid % 10000}",
             "ref": None,
             "refs": 0,
             "total_bets": 0.0,
@@ -117,7 +119,31 @@ def get_user(uid):
             "await_withdraw": False,
             "pending_game": None,
         }
+    elif username:
+        users[uid]["username"] = username
+    # username индексін жаңарту
+    if users[uid].get("username"):
+        username_index[users[uid]["username"].lower().replace("@", "")] = uid
     return users[uid]
+
+
+def find_user_by_username(username):
+    """Username арқылы пайдаланушыны табу"""
+    username_clean = username.lower().replace("@", "").strip()
+    # Тікелей индекстен
+    if username_clean in username_index:
+        uid = username_index[username_clean]
+        return uid, users.get(uid)
+    # Іздеу
+    for uid, u in users.items():
+        u_name = u.get("username", "").lower().replace("@", "")
+        if u_name == username_clean:
+            return uid, u
+    return None, None
+
+
+def get_display_name(uid, u):
+    return u.get("username", f"Player{uid % 10000}")
 
 
 def bottom_menu():
@@ -172,7 +198,6 @@ def game_menu(uid, game_key):
     buttons = []
 
     if "rows" in g:
-        # Арнайы layout (2 баған)
         for row in g["rows"]:
             btn_row = []
             for choice_key in row:
@@ -183,7 +208,6 @@ def game_menu(uid, game_key):
                 ))
             buttons.append(btn_row)
     else:
-        # Әдепкі (1 баған)
         for choice_key, choice in g["choices"].items():
             buttons.append([InlineKeyboardButton(
                 text=f"{choice['name']} (x{choice['x']})",
@@ -198,12 +222,14 @@ def game_menu(uid, game_key):
 @dp.message(Command("start"))
 async def cmd_start(m: types.Message):
     uid = m.from_user.id
+    username = f"@{m.from_user.username}" if m.from_user.username else m.from_user.first_name
+    u = get_user(uid, username)
+
     args = m.text.split()
     if len(args) > 1 and args[1].startswith("ref"):
         try:
             ref_id = int(args[1].replace("ref", ""))
             if ref_id != uid:
-                u = get_user(uid)
                 if u["ref"] is None:
                     u["ref"] = ref_id
                     get_user(ref_id)["refs"] += 1
@@ -213,6 +239,7 @@ async def cmd_start(m: types.Message):
                         pass
         except:
             pass
+
     await m.answer(menu_text(uid), reply_markup=main_menu(uid), parse_mode="HTML")
     await m.answer("Меню 👇", reply_markup=bottom_menu())
 
@@ -226,6 +253,7 @@ async def cmd_bonus(m: types.Message):
 
     args = m.text.split()
 
+    # ===== REPLY арқылы =====
     if m.reply_to_message:
         if len(args) < 2:
             await m.answer("❌ Использование: <code>/bonus 10</code>", parse_mode="HTML")
@@ -235,11 +263,16 @@ async def cmd_bonus(m: types.Message):
         except:
             await m.answer("❌ Неверная сумма")
             return
-        target_uid = m.reply_to_message.from_user.id
-        get_user(target_uid)["balance"] = round(get_user(target_uid)["balance"] + amount, 2)
+
+        target_user = m.reply_to_message.from_user
+        target_uid = target_user.id
+        target_name = f"@{target_user.username}" if target_user.username else target_user.first_name
+
+        get_user(target_uid, target_name)["balance"] = round(get_user(target_uid)["balance"] + amount, 2)
+
         await m.answer(
             f"✅ <b>Бонус выдан!</b>\n\n"
-            f"👤 User: <code>{target_uid}</code>\n"
+            f"👤 Игрок: <b>{target_name}</b>\n"
             f"➕ Сумма: <b>+{amount}$</b>\n"
             f"💰 Баланс: <b>{get_user(target_uid)['balance']}$</b>",
             parse_mode="HTML"
@@ -256,28 +289,47 @@ async def cmd_bonus(m: types.Message):
             pass
         return
 
+    # ===== @username арқылы =====
     if len(args) < 3:
         await m.answer(
             "📋 <b>Использование:</b>\n\n"
-            "1️⃣ Ответом: <code>/bonus 10</code>\n"
-            "2️⃣ По ID: <code>/bonus 123456789 10</code>",
+            "1️⃣ Ответом на сообщение:\n"
+            "<code>/bonus 10</code>\n\n"
+            "2️⃣ По username:\n"
+            "<code>/bonus @username 10</code>",
             parse_mode="HTML"
         )
         return
 
-    try:
-        target_uid = int(args[1])
-        amount = float(args[2])
-    except:
-        await m.answer("❌ Неверный формат")
+    target_username = args[1]
+    if not target_username.startswith("@"):
+        await m.answer("❌ Username @ арқылы басталуы керек\nМысалы: <code>/bonus @AimonKz 10</code>", parse_mode="HTML")
         return
 
-    get_user(target_uid)["balance"] = round(get_user(target_uid)["balance"] + amount, 2)
+    try:
+        amount = float(args[2])
+    except:
+        await m.answer("❌ Неверная сумма")
+        return
+
+    target_uid, target_u = find_user_by_username(target_username)
+
+    if target_uid is None:
+        await m.answer(
+            f"❌ Пользователь <b>{target_username}</b> не найден!\n\n"
+            f"💡 Убедитесь, что он запустил бота (/start)",
+            parse_mode="HTML"
+        )
+        return
+
+    target_u["balance"] = round(target_u["balance"] + amount, 2)
+    target_name = target_u["username"]
+
     await m.answer(
         f"✅ <b>Бонус выдан!</b>\n\n"
-        f"👤 User: <code>{target_uid}</code>\n"
+        f"👤 Игрок: <b>{target_name}</b>\n"
         f"➕ Сумма: <b>+{amount}$</b>\n"
-        f"💰 Баланс: <b>{get_user(target_uid)['balance']}$</b>",
+        f"💰 Баланс: <b>{target_u['balance']}$</b>",
         parse_mode="HTML"
     )
     try:
@@ -285,7 +337,7 @@ async def cmd_bonus(m: types.Message):
             target_uid,
             f"🎁 <b>Вам выдан бонус!</b>\n\n"
             f"➕ <b>+{amount}$</b>\n"
-            f"💰 Баланс: <b>{get_user(target_uid)['balance']}$</b>",
+            f"💰 Баланс: <b>{target_u['balance']}$</b>",
             parse_mode="HTML"
         )
     except:
@@ -301,7 +353,7 @@ async def cb_admin_panel(cb: types.CallbackQuery):
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="🎁 Выдать бонус", callback_data="admin_bonus")],
         [InlineKeyboardButton(text="📊 Статистика", callback_data="admin_stats")],
-        [InlineKeyboardButton(text="👥 Все пользователи", callback_data="admin_users")],
+        [InlineKeyboardButton(text="👥 Все игроки", callback_data="admin_users")],
         [InlineKeyboardButton(text="📢 Рассылка", callback_data="admin_broadcast")],
         [InlineKeyboardButton(text="🏆 Топ рефералов", callback_data="top_refs")],
         [InlineKeyboardButton(text="💰 Топ по балансу", callback_data="top_balance")],
@@ -322,10 +374,11 @@ async def cb_admin_bonus(cb: types.CallbackQuery):
         return
     await cb.message.answer(
         "🎁 <b>Выдача бонуса</b>\n\n"
-        "<b>Способ 1:</b> Ответом на сообщение\n"
+        "<b>Способ 1:</b> Ответом на сообщение игрока\n"
         "<code>/bonus 10</code>\n\n"
-        "<b>Способ 2:</b> По ID\n"
-        "<code>/bonus 123456789 10</code>",
+        "<b>Способ 2:</b> По username\n"
+        "<code>/bonus @username 10</code>\n\n"
+        "💡 ID не нужен!",
         parse_mode="HTML"
     )
     await cb.answer()
@@ -343,7 +396,7 @@ async def cb_admin_stats(cb: types.CallbackQuery):
     total_games = sum(u.get("games_played", 0) for u in users.values())
     await cb.message.answer(
         f"📊 <b>СТАТИСТИКА</b>\n\n"
-        f"👥 Пользователей: <b>{total_users}</b>\n"
+        f"👥 Игроков: <b>{total_users}</b>\n"
         f"💰 Общий баланс: <b>{round(total_balance, 2)}$</b>\n"
         f"👥 Всего рефералов: <b>{total_refs}</b>\n"
         f"🎮 Всего игр: <b>{total_games}</b>\n"
@@ -359,12 +412,13 @@ async def cb_admin_users(cb: types.CallbackQuery):
         await cb.answer("❌ Нет прав!")
         return
     if not users:
-        await cb.message.answer("📭 Пользователей нет")
+        await cb.message.answer("📭 Игроков нет")
         await cb.answer()
         return
-    text = "👥 <b>ПОЛЬЗОВАТЕЛИ</b>\n\n"
+    text = "👥 <b>ВСЕ ИГРОКИ</b>\n\n"
     for i, (uid, u) in enumerate(users.items(), 1):
-        text += f"{i}. <code>{uid}</code>\n   💰 {u['balance']}$ | 👥 {u['refs']}\n"
+        name = get_display_name(uid, u)
+        text += f"{i}. <b>{name}</b>\n   💰 {u['balance']}$ | 👥 {u['refs']}\n"
         if i >= 30:
             text += f"\n... и ещё {len(users) - 30}"
             break
@@ -419,7 +473,8 @@ async def cb_top_refs(cb: types.CallbackQuery):
     for i, (uid, u) in enumerate(sorted_users, 1):
         if u.get("refs", 0) > 0:
             count += 1
-            text += f"{i}. <code>{uid}</code> — 👥 {u['refs']}\n"
+            name = get_display_name(uid, u)
+            text += f"{i}. <b>{name}</b> — 👥 {u['refs']}\n"
     if count == 0:
         text += "Пока никого нет"
     await cb.message.answer(text, parse_mode="HTML")
@@ -430,9 +485,14 @@ async def cb_top_refs(cb: types.CallbackQuery):
 async def cb_top_balance(cb: types.CallbackQuery):
     sorted_users = sorted(users.items(), key=lambda x: x[1].get("balance", 0), reverse=True)[:10]
     text = "💰 <b>ТОП ПО БАЛАНСУ</b>\n\n"
+    count = 0
     for i, (uid, u) in enumerate(sorted_users, 1):
         if u.get("balance", 0) > 0:
-            text += f"{i}. <code>{uid}</code> — 💰 {round(u['balance'], 2)}$\n"
+            count += 1
+            name = get_display_name(uid, u)
+            text += f"{i}. <b>{name}</b> — 💰 {round(u['balance'], 2)}$\n"
+    if count == 0:
+        text += "Пока никого нет"
     await cb.message.answer(text, parse_mode="HTML")
     await cb.answer()
 
@@ -441,12 +501,17 @@ async def cb_top_balance(cb: types.CallbackQuery):
 async def cb_top_players(cb: types.CallbackQuery):
     sorted_users = sorted(users.items(), key=lambda x: x[1].get("total_bets", 0), reverse=True)[:10]
     text = "🎮 <b>ТОП ИГРОКОВ</b>\n\n"
+    count = 0
     for i, (uid, u) in enumerate(sorted_users, 1):
         if u.get("total_bets", 0) > 0:
+            count += 1
+            name = get_display_name(uid, u)
             text += (
-                f"{i}. <code>{uid}</code>\n"
+                f"{i}. <b>{name}</b>\n"
                 f"   🎮 {u.get('games_played', 0)} игр | 💵 {round(u['total_bets'], 2)}$\n"
             )
+    if count == 0:
+        text += "Пока никого нет"
     await cb.message.answer(text, parse_mode="HTML")
     await cb.answer()
 
@@ -454,13 +519,18 @@ async def cb_top_players(cb: types.CallbackQuery):
 # ==================== REPLY BUTTONS ====================
 @dp.message(F.text == "💰 Баланс")
 async def btn_balance(m: types.Message):
-    u = get_user(m.from_user.id)
+    uid = m.from_user.id
+    username = f"@{m.from_user.username}" if m.from_user.username else m.from_user.first_name
+    u = get_user(uid, username)
     await m.answer(f"💰 <b>Ваш баланс:</b> {u['balance']}$\n👥 Рефералов: {u['refs']}", parse_mode="HTML")
 
 
 @dp.message(F.text == "🎮 Играть")
 async def btn_play(m: types.Message):
-    await m.answer(menu_text(m.from_user.id), reply_markup=main_menu(m.from_user.id), parse_mode="HTML")
+    uid = m.from_user.id
+    username = f"@{m.from_user.username}" if m.from_user.username else m.from_user.first_name
+    get_user(uid, username)
+    await m.answer(menu_text(uid), reply_markup=main_menu(uid), parse_mode="HTML")
 
 
 @dp.message(F.text == "🏆 Топ")
@@ -536,12 +606,11 @@ async def cb_choice(cb: types.CallbackQuery):
 
 # ==================== ОЙЫН + КАНАЛ ====================
 async def play_game(message, uid, game_key, choice_key, bet):
-    u = get_user(uid)
-    g = GAMES[game_key]
-    choice = g["choices"][choice_key]
-
     user = message.from_user
     nick = f"@{user.username}" if user.username else user.first_name
+    u = get_user(uid, nick)
+    g = GAMES[game_key]
+    choice = g["choices"][choice_key]
 
     if CHANNEL_ID:
         try:
@@ -566,7 +635,6 @@ async def play_game(message, uid, game_key, choice_key, bet):
     result = dice_msg.dice.value
     is_win, result_text = check_win(game_key, choice_key, result)
 
-    # Статистика
     u["total_bets"] = round(u.get("total_bets", 0) + bet, 2)
     u["games_played"] = u.get("games_played", 0) + 1
 
@@ -619,7 +687,6 @@ async def play_game(message, uid, game_key, choice_key, bet):
 def check_win(game_key, choice_key, result):
     text, win = "", False
 
-    # ===== КОСТИ =====
     if game_key == "dice":
         if choice_key == "more3":
             win = result >= 4
@@ -634,7 +701,6 @@ def check_win(game_key, choice_key, result):
             win = result % 2 == 1
             text = f"Выпало {result} → {'нечётное ✅' if win else 'Чётное ❌'}"
 
-    # ===== ФУТБОЛ =====
     elif game_key == "football":
         is_goal = result >= 3
         if choice_key == "goal":
@@ -644,7 +710,6 @@ def check_win(game_key, choice_key, result):
             win = not is_goal
             text = f"Выпало {result} → {'Промах ✅' if win else 'ГОЛ ❌'}"
 
-    # ===== БАСКЕТБОЛ =====
     elif game_key == "basketball":
         is_goal = result >= 3
         if choice_key == "goal":
@@ -654,7 +719,6 @@ def check_win(game_key, choice_key, result):
             win = not is_goal
             text = f"Выпало {result} → {'Промах ✅' if win else 'ГОЛ ❌'}"
 
-    # ===== ДАРТС =====
     elif game_key == "darts":
         if choice_key == "center":
             win = result == 6
@@ -678,7 +742,6 @@ def check_win(game_key, choice_key, result):
             win = result in [1, 2, 3]
             text = f"Выпало {result} → {'Белый или Отскок ✅' if win else 'НЕ ✅ ❌'}"
 
-    # ===== БОУЛИНГ =====
     elif game_key == "bowling":
         if choice_key == "strike":
             win = result == 6
@@ -699,7 +762,6 @@ def check_win(game_key, choice_key, result):
             win = result == 5
             text = f"Сбито {result}/6 → {'✅' if win else '❌'}"
 
-    # ===== 777 =====
     elif game_key == "slot":
         if choice_key == "777":
             win = result == 64
@@ -740,7 +802,7 @@ async def create_deposit_invoice(message, uid, amount):
     try:
         invoice = await crypto.create_invoice(
             asset="USDT", amount=amount,
-            description=f"Пополнение (ID: {uid})",
+            description=f"Пополнение",
             payload=f"dep_{uid}_{amount}", expires_in=1800,
         )
         kb = InlineKeyboardMarkup(inline_keyboard=[
@@ -783,7 +845,7 @@ async def cb_check(cb: types.CallbackQuery):
                 except:
                     pass
             try:
-                await bot.send_message(ADMIN_ID, f"💳 Пополнение: {uid} — {amount}$")
+                await bot.send_message(ADMIN_ID, f"💳 Пополнение: {get_user(uid).get('username', '?')} — {amount}$")
             except:
                 pass
         else:
@@ -818,10 +880,12 @@ async def cb_withdraw(cb: types.CallbackQuery):
 # ==================== PROFILE / REF ====================
 @dp.callback_query(F.data == "profile")
 async def cb_profile(cb: types.CallbackQuery):
-    u = get_user(cb.from_user.id)
+    uid = cb.from_user.id
+    username = f"@{cb.from_user.username}" if cb.from_user.username else cb.from_user.first_name
+    u = get_user(uid, username)
     await cb.message.answer(
         f"👤 <b>Профиль</b>\n\n"
-        f"🆔 ID: <code>{cb.from_user.id}</code>\n"
+        f"📛 Имя: <b>{u['username']}</b>\n"
         f"💰 Баланс: <b>{u['balance']}$</b>\n"
         f"👥 Рефералов: <b>{u['refs']}</b>\n"
         f"🎮 Игр: <b>{u.get('games_played', 0)}</b>\n"
@@ -855,7 +919,8 @@ async def cb_author(cb: types.CallbackQuery):
 @dp.message(F.text.regexp(r"^\d+(\.\d+)?$"))
 async def set_number(m: types.Message):
     uid = m.from_user.id
-    u = get_user(uid)
+    username = f"@{m.from_user.username}" if m.from_user.username else m.from_user.first_name
+    u = get_user(uid, username)
     val = float(m.text)
 
     if u.get("pending_game"):
@@ -921,7 +986,7 @@ async def set_number(m: types.Message):
             try:
                 await bot.send_message(
                     ADMIN_ID,
-                    f"📤 <b>Вывод</b>\n\n👤 User: <code>{uid}</code>\n💰 Сумма: {val}$\n🔗 {check.bot_check_url}",
+                    f"📤 <b>Вывод</b>\n\n👤 {username}\n💰 Сумма: {val}$\n🔗 {check.bot_check_url}",
                     parse_mode="HTML"
                 )
             except:
