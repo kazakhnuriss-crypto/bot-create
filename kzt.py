@@ -61,10 +61,9 @@ GAMES = {
     },
     "darts": {
         "emoji": "🎯", "name": "Сектор", "choices": {
-            "red":    {"name": "Красный сектор", "x": 2},
-            "white":  {"name": "Белый сектор", "x": 2},
             "center": {"name": "Прямо в центр", "x": 5},
-            "bounce": {"name": "Отскок", "x": 3},
+            "hit":    {"name": "Попадание", "x": 2},
+            "miss":   {"name": "Промах", "x": 3},
         }
     },
     "bowling": {
@@ -77,7 +76,6 @@ GAMES = {
     "slot": {
         "emoji": "🎰", "name": "777", "choices": {
             "777": {"name": "777 (Джекпот)", "x": 10},
-            "any": {"name": "Любая комбинация", "x": 2},
         }
     },
 }
@@ -520,6 +518,7 @@ async def play_game(message, uid, game_key, choice_key, bet):
 def check_win(game_key, choice_key, result):
     text, win = "", False
 
+    # ===== КОСТИ =====
     if game_key == "dice":
         if choice_key == "more3":
             win = result >= 4
@@ -534,8 +533,9 @@ def check_win(game_key, choice_key, result):
             win = result % 2 == 1
             text = f"Выпало {result} → {'нечётное ✅' if win else 'Чётное ❌'}"
 
+    # ===== ФУТБОЛ (визуалға сәйкес) =====
     elif game_key == "football":
-        is_goal = result >= 4
+        is_goal = result >= 3
         if choice_key == "goal":
             win = is_goal
             text = f"Выпало {result} → {'ГОЛ ✅' if win else 'Промах ❌'}"
@@ -543,8 +543,9 @@ def check_win(game_key, choice_key, result):
             win = not is_goal
             text = f"Выпало {result} → {'Промах ✅' if win else 'ГОЛ ❌'}"
 
+    # ===== БАСКЕТБОЛ (визуалға сәйкес) =====
     elif game_key == "basketball":
-        is_goal = result >= 4
+        is_goal = result >= 3
         if choice_key == "goal":
             win = is_goal
             text = f"Выпало {result} → {'ГОЛ ✅' if win else 'Промах ❌'}"
@@ -552,20 +553,19 @@ def check_win(game_key, choice_key, result):
             win = not is_goal
             text = f"Выпало {result} → {'Промах ✅' if win else 'ГОЛ ❌'}"
 
+    # ===== ДАРТС (визуалға сәйкес) =====
     elif game_key == "darts":
         if choice_key == "center":
             win = result == 6
             text = f"Выпало {result} → {'ЦЕНТР ✅' if win else 'Не центр ❌'}"
-        elif choice_key == "red":
-            win = result == 5
-            text = f"Выпало {result} → {'Красный ✅' if win else 'Не красный ❌'}"
-        elif choice_key == "white":
-            win = result in [3, 4]
-            text = f"Выпало {result} → {'Белый ✅' if win else 'Не белый ❌'}"
-        elif choice_key == "bounce":
-            win = result in [1, 2]
-            text = f"Выпало {result} → {'Отскок ✅' if win else 'Не отскок ❌'}"
+        elif choice_key == "hit":
+            win = result in [2, 3, 4, 5]
+            text = f"Выпало {result} → {'Попадание ✅' if win else 'Промах ❌'}"
+        elif choice_key == "miss":
+            win = result == 1
+            text = f"Выпало {result} → {'Промах ✅' if win else 'Попадание ❌'}"
 
+    # ===== БОУЛИНГ =====
     elif game_key == "bowling":
         if choice_key == "strike":
             win = result == 6
@@ -577,13 +577,11 @@ def check_win(game_key, choice_key, result):
             win = 2 <= result <= 5
             text = f"Выпало {result} → {'Часть сбита ✅' if win else 'Не часть ❌'}"
 
+    # ===== 777 (тек джекпот) =====
     elif game_key == "slot":
         if choice_key == "777":
             win = result == 64
             text = f"Выпало {result} → {'ДЖЕКПОТ ✅' if win else 'Не 777 ❌'}"
-        elif choice_key == "any":
-            win = result >= 1
-            text = f"Выпало {result} → {'Любая ✅' if win else 'Пусто ❌'}"
 
     return win, text
 
