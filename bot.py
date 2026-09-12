@@ -37,14 +37,14 @@ except Exception as e:
 
 users = {}
 
-# ==================== ОЙЫНДАР ====================
+# ==================== ОЙЫНДАР (бастапқы шанстар) ====================
 GAMES = {
     "dice": {
         "emoji": "🎲", "name": "Кости", "choices": {
-            "more3": {"name": "Больше (5-6)", "x": 2},
-            "less3": {"name": "Меньше (1)", "x": 3},
-            "even":  {"name": "Чётное (2,6)", "x": 2},
-            "odd":   {"name": "Нечётное (1,5)", "x": 2},
+            "more3": {"name": "Больше (4-6)", "x": 2},
+            "less3": {"name": "Меньше (1-2)", "x": 3},
+            "even":  {"name": "Чётное (2,4,6)", "x": 2},
+            "odd":   {"name": "Нечётное (1,3,5)", "x": 2},
         }
     },
     "football": {
@@ -107,7 +107,7 @@ def bottom_menu():
 
 
 def main_menu(uid):
-    kb = InlineKeyboardMarkup(inline_keyboard=[
+    buttons = [
         [
             InlineKeyboardButton(text="🎲 Кости", callback_data="game_dice"),
             InlineKeyboardButton(text="⚽ Футбол", callback_data="game_football"),
@@ -127,8 +127,12 @@ def main_menu(uid):
             InlineKeyboardButton(text="💳 Пополнить", callback_data="deposit"),
             InlineKeyboardButton(text="📤 Вывести", callback_data="withdraw"),
         ],
-    ])
-    return kb
+    ]
+    if uid == ADMIN_ID:
+        buttons.append([
+            InlineKeyboardButton(text="👑 АДМИН-ПАНЕЛЬ", callback_data="admin_panel")
+        ])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
 def menu_text(uid):
@@ -183,20 +187,17 @@ async def cmd_bonus(m: types.Message):
 
     args = m.text.split()
 
-    # Reply арқылы
     if m.reply_to_message:
         if len(args) < 2:
-            await m.answer("❌ Использование: <code>/bonus 10</code> (ответом)", parse_mode="HTML")
+            await m.answer("❌ Использование: <code>/bonus 10</code>", parse_mode="HTML")
             return
         try:
             amount = float(args[1])
         except:
             await m.answer("❌ Неверная сумма")
             return
-
         target_uid = m.reply_to_message.from_user.id
         get_user(target_uid)["balance"] = round(get_user(target_uid)["balance"] + amount, 2)
-
         await m.answer(
             f"✅ <b>Бонус выдан!</b>\n\n"
             f"👤 User: <code>{target_uid}</code>\n"
@@ -216,7 +217,6 @@ async def cmd_bonus(m: types.Message):
             pass
         return
 
-    # ID арқылы
     if len(args) < 3:
         await m.answer(
             "📋 <b>Использование:</b>\n\n"
@@ -234,7 +234,6 @@ async def cmd_bonus(m: types.Message):
         return
 
     get_user(target_uid)["balance"] = round(get_user(target_uid)["balance"] + amount, 2)
-
     await m.answer(
         f"✅ <b>Бонус выдан!</b>\n\n"
         f"👤 User: <code>{target_uid}</code>\n"
@@ -252,6 +251,117 @@ async def cmd_bonus(m: types.Message):
         )
     except:
         pass
+
+
+# ==================== АДМИН-ПАНЕЛЬ ====================
+@dp.callback_query(F.data == "admin_panel")
+async def cb_admin_panel(cb: types.CallbackQuery):
+    if cb.from_user.id != ADMIN_ID:
+        await cb.answer("❌ Нет прав!")
+        return
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🎁 Выдать бонус", callback_data="admin_bonus")],
+        [InlineKeyboardButton(text="📊 Статистика", callback_data="admin_stats")],
+        [InlineKeyboardButton(text="👥 Все пользователи", callback_data="admin_users")],
+        [InlineKeyboardButton(text="📢 Рассылка", callback_data="admin_broadcast")],
+        [InlineKeyboardButton(text="⬅️ Назад", callback_data="back_menu")],
+    ])
+    await cb.message.answer(
+        "👑 <b>АДМИН-ПАНЕЛЬ</b>\n\nВыберите действие:",
+        reply_markup=kb, parse_mode="HTML"
+    )
+    await cb.answer()
+
+
+@dp.callback_query(F.data == "admin_bonus")
+async def cb_admin_bonus(cb: types.CallbackQuery):
+    if cb.from_user.id != ADMIN_ID:
+        await cb.answer("❌ Нет прав!")
+        return
+    await cb.message.answer(
+        "🎁 <b>Выдача бонуса</b>\n\n"
+        "<b>Способ 1:</b> Ответом на сообщение\n"
+        "<code>/bonus 10</code>\n\n"
+        "<b>Способ 2:</b> По ID\n"
+        "<code>/bonus 123456789 10</code>",
+        parse_mode="HTML"
+    )
+    await cb.answer()
+
+
+@dp.callback_query(F.data == "admin_stats")
+async def cb_admin_stats(cb: types.CallbackQuery):
+    if cb.from_user.id != ADMIN_ID:
+        await cb.answer("❌ Нет прав!")
+        return
+    total_users = len(users)
+    total_balance = sum(u["balance"] for u in users.values())
+    total_refs = sum(u["refs"] for u in users.values())
+    await cb.message.answer(
+        f"📊 <b>СТАТИСТИКА</b>\n\n"
+        f"👥 Пользователей: <b>{total_users}</b>\n"
+        f"💰 Общий баланс: <b>{round(total_balance, 2)}$</b>\n"
+        f"👥 Всего рефералов: <b>{total_refs}</b>",
+        parse_mode="HTML"
+    )
+    await cb.answer()
+
+
+@dp.callback_query(F.data == "admin_users")
+async def cb_admin_users(cb: types.CallbackQuery):
+    if cb.from_user.id != ADMIN_ID:
+        await cb.answer("❌ Нет прав!")
+        return
+    if not users:
+        await cb.message.answer("📭 Пользователей нет")
+        await cb.answer()
+        return
+    text = "👥 <b>ПОЛЬЗОВАТЕЛИ</b>\n\n"
+    for i, (uid, u) in enumerate(users.items(), 1):
+        text += f"{i}. <code>{uid}</code>\n   💰 {u['balance']}$ | 👥 {u['refs']}\n"
+        if i >= 30:
+            text += f"\n... и ещё {len(users) - 30}"
+            break
+    await cb.message.answer(text, parse_mode="HTML")
+    await cb.answer()
+
+
+@dp.callback_query(F.data == "admin_broadcast")
+async def cb_admin_broadcast(cb: types.CallbackQuery):
+    if cb.from_user.id != ADMIN_ID:
+        await cb.answer("❌ Нет прав!")
+        return
+    await cb.message.answer(
+        "📢 <b>Рассылка</b>\n\n"
+        "Отправьте: <code>/send Текст сообщения</code>",
+        parse_mode="HTML"
+    )
+    await cb.answer()
+
+
+@dp.message(Command("send"))
+async def cmd_send(m: types.Message):
+    if m.from_user.id != ADMIN_ID:
+        await m.answer("❌ У вас нет прав!")
+        return
+    text = m.text.replace("/send ", "", 1).strip()
+    if not text or text == "/send":
+        await m.answer("❌ Использование: <code>/send Текст</code>", parse_mode="HTML")
+        return
+    success, failed = 0, 0
+    for uid in list(users.keys()):
+        try:
+            await bot.send_message(uid, text, parse_mode="HTML")
+            success += 1
+            await asyncio.sleep(0.05)
+        except:
+            failed += 1
+    await m.answer(
+        f"✅ <b>Рассылка завершена!</b>\n\n"
+        f"📤 Отправлено: <b>{success}</b>\n"
+        f"❌ Ошибок: <b>{failed}</b>",
+        parse_mode="HTML"
+    )
 
 
 # ==================== REPLY BUTTONS ====================
@@ -325,17 +435,16 @@ async def cb_choice(cb: types.CallbackQuery):
     await cb.answer()
 
 
-# ==================== ОЙЫН + КАНАЛҒА ЖАРИЯЛАУ ====================
+# ==================== ОЙЫН + КАНАЛ ====================
 async def play_game(message, uid, game_key, choice_key, bet):
     u = get_user(uid)
     g = GAMES[game_key]
     choice = g["choices"][choice_key]
 
-    # Пайдаланушы аты
     user = message.from_user
     nick = f"@{user.username}" if user.username else user.first_name
 
-    # ===== КАНАЛҒА: ОЙЫН БАСТАЛДЫ =====
+    # КАНАЛҒА: СТАВКА
     if CHANNEL_ID:
         try:
             await bot.send_message(
@@ -348,7 +457,7 @@ async def play_game(message, uid, game_key, choice_key, bet):
         except Exception as e:
             print(f"Каналға жіберу қатесі: {e}")
 
-    # ===== ОЙЫН =====
+    # ОЙЫН
     dice_msg = await message.answer_dice(emoji=g["emoji"])
     await asyncio.sleep(4)
     result = dice_msg.dice.value
@@ -391,10 +500,9 @@ async def play_game(message, uid, game_key, choice_key, bet):
             f"➖ Проигрыш: <b>-{bet}$</b>"
         )
 
-    # Пайдаланушыға
     await message.answer(text, parse_mode="HTML", reply_markup=main_menu(uid))
 
-    # ===== КАНАЛҒА: НӘТИЖЕ =====
+    # КАНАЛҒА: НӘТИЖЕ
     if CHANNEL_ID:
         try:
             await bot.send_message(CHANNEL_ID, channel_text, parse_mode="HTML")
@@ -404,19 +512,22 @@ async def play_game(message, uid, game_key, choice_key, bet):
 
 def check_win(game_key, choice_key, result):
     text, win = "", False
+
+    # ===== КОСТИ (бастапқы шанстар) =====
     if game_key == "dice":
         if choice_key == "more3":
-            win = result >= 5
+            win = result >= 4
             text = f"Выпало {result} → {'больше 3 ✅' if win else 'НЕ больше 3 ❌'}"
         elif choice_key == "less3":
-            win = result == 1
+            win = result <= 2
             text = f"Выпало {result} → {'меньше 3 ✅' if win else 'НЕ меньше 3 ❌'}"
         elif choice_key == "even":
-            win = result in [2, 6]
+            win = result % 2 == 0
             text = f"Выпало {result} → {'чётное ✅' if win else 'НЕчётное ❌'}"
         elif choice_key == "odd":
-            win = result in [1, 5]
+            win = result % 2 == 1
             text = f"Выпало {result} → {'нечётное ✅' if win else 'Чётное ❌'}"
+
     elif game_key == "football":
         is_goal = result >= 4
         if choice_key == "goal":
@@ -425,6 +536,7 @@ def check_win(game_key, choice_key, result):
         elif choice_key == "miss":
             win = not is_goal
             text = f"Выпало {result} → {'Промах ✅' if win else 'ГОЛ ❌'}"
+
     elif game_key == "basketball":
         is_goal = result >= 4
         if choice_key == "goal":
@@ -433,6 +545,7 @@ def check_win(game_key, choice_key, result):
         elif choice_key == "miss":
             win = not is_goal
             text = f"Выпало {result} → {'Промах ✅' if win else 'ГОЛ ❌'}"
+
     elif game_key == "darts":
         if choice_key == "center":
             win = result == 6
@@ -446,6 +559,7 @@ def check_win(game_key, choice_key, result):
         elif choice_key == "bounce":
             win = result in [1, 2]
             text = f"Выпало {result} → {'Отскок ✅' if win else 'Не отскок ❌'}"
+
     elif game_key == "bowling":
         if choice_key == "strike":
             win = result == 6
@@ -456,6 +570,7 @@ def check_win(game_key, choice_key, result):
         elif choice_key == "some":
             win = 2 <= result <= 5
             text = f"Выпало {result} → {'Часть сбита ✅' if win else 'Не часть ❌'}"
+
     elif game_key == "slot":
         if choice_key == "777":
             win = result == 64
@@ -463,6 +578,7 @@ def check_win(game_key, choice_key, result):
         elif choice_key == "any":
             win = result >= 1
             text = f"Выпало {result} → {'Любая ✅' if win else 'Пусто ❌'}"
+
     return win, text
 
 
