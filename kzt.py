@@ -25,7 +25,7 @@ BET_MIN = 0.1
 BET_MAX = 10000.0
 WITHDRAW_MIN = 1.0
 REF_PERCENT = 0.10
-HOUSE_EDGE = 0.05    # 5% комиссия от выигрыша
+HOUSE_EDGE = 0.08    # 8% комиссия от выигрыша
 
 # ==================== ЛОГИКА ====================
 logging.basicConfig(level=logging.INFO)
@@ -107,14 +107,14 @@ def db_update_user(uid, **kwargs):
     conn.close()
 
 
-# ==================== ОЙЫНДАР (ШАНС АЗАЙТЫЛҒАН) ====================
+# ==================== ОЙЫНДАР ====================
 GAMES = {
     "dice": {
         "emoji": "🎲", "name": "Кости", "choices": {
-            "more3": {"name": "Больше (5-6)", "x": 2},       # 33%
-            "less3": {"name": "Меньше (1-2)", "x": 2},       # 33%
-            "even":  {"name": "Чётное (2,6)", "x": 3},       # 33%
-            "odd":   {"name": "Нечётное (1,5)", "x": 3},     # 33%
+            "more3": {"name": "Больше (5-6)", "x": 2},
+            "less3": {"name": "Меньше (1-2)", "x": 2},
+            "even":  {"name": "Чётное (2,6)", "x": 3},
+            "odd":   {"name": "Нечётное (1,5)", "x": 3},
         }
     },
     "football": {
@@ -825,8 +825,8 @@ async def play_game(message, uid, game_key, choice_key, bet):
 
     if is_win:
         win_full = round(bet * choice["x"], 2)
-        commission = round(win_full * HOUSE_EDGE, 2)   # 5% комиссия
-        win = round(win_full - commission, 2)          # Қолына тиетін
+        commission = round(win_full * HOUSE_EDGE, 2)
+        win = round(win_full - commission, 2)
         new_balance = round(u["balance"] - bet + win, 2)
         new_total_won = round(u.get("total_won", 0) + win, 2)
         db_update_user(uid, balance=new_balance, total_bets=new_total_bets, games_played=new_games, total_won=new_total_won)
@@ -874,8 +874,18 @@ async def play_game(message, uid, game_key, choice_key, bet):
 
 
 def check_win(game_key, choice_key, result):
+    """
+    Telegram dice values:
+    🎲 dice: 1-6
+    ⚽ football: 1=промах, 2=штанга, 3=сейв, 4=гол, 5=гол
+    🏀 basketball: 1-3=промах, 4-5=гол
+    🎯 darts: 1=промах, 2=красный, 3=белый, 4=красный, 5=белый, 6=центр
+    🎳 bowling: 1-5=частично, 6=страйк
+    🎰 slot: 1-64, 64=777
+    """
     text, win = "", False
 
+    # ===== КОСТИ =====
     if game_key == "dice":
         if choice_key == "more3":
             win = result >= 5
@@ -885,13 +895,15 @@ def check_win(game_key, choice_key, result):
             text = f"Выпало {result} → {'меньше 3 ✅' if win else 'НЕ меньше 3 ❌'}"
         elif choice_key == "even":
             win = result in [2, 6]
-            text = f"Выпало {result} → {'чётное ✅' if win else 'НЕчётное ❌'}"
+            text = f"Выпало {result} → {'чётное (2,6) ✅' if win else 'НЕ чётное ❌'}"
         elif choice_key == "odd":
             win = result in [1, 5]
-            text = f"Выпало {result} → {'нечётное ✅' if win else 'Чётное ❌'}"
+            text = f"Выпало {result} → {'нечётное (1,5) ✅' if win else 'НЕ нечётное ❌'}"
 
+    # ===== ФУТБОЛ =====
     elif game_key == "football":
-        is_goal = result >= 3
+        # 1,2,3 = промах; 4,5 = гол
+        is_goal = result >= 4
         if choice_key == "goal":
             win = is_goal
             text = f"Выпало {result} → {'ГОЛ ✅' if win else 'Промах ❌'}"
@@ -899,8 +911,10 @@ def check_win(game_key, choice_key, result):
             win = not is_goal
             text = f"Выпало {result} → {'Промах ✅' if win else 'ГОЛ ❌'}"
 
+    # ===== БАСКЕТБОЛ =====
     elif game_key == "basketball":
-        is_goal = result >= 3
+        # 1,2,3 = промах; 4,5 = гол
+        is_goal = result >= 4
         if choice_key == "goal":
             win = is_goal
             text = f"Выпало {result} → {'ГОЛ ✅' if win else 'Промах ❌'}"
@@ -908,20 +922,21 @@ def check_win(game_key, choice_key, result):
             win = not is_goal
             text = f"Выпало {result} → {'Промах ✅' if win else 'ГОЛ ❌'}"
 
+    # ===== ДАРТС (түзетілген) =====
     elif game_key == "darts":
         # 1 = промах/отскок
-        # 2, 4 = БЕЛЫЕ сектора
-        # 3, 5 = КРАСНЫЕ сектора
+        # 2, 4 = КРАСНЫЕ сектора
+        # 3, 5 = БЕЛЫЕ сектора
         # 6 = центр
         if choice_key == "center":
             win = result == 6
             text = f"Выпало {result} → {'ЦЕНТР ✅' if win else 'Не центр ❌'}"
         elif choice_key == "red":
-            win = result in [3, 5]
-            text = f"Выпало {result} → {'Красный ✅' if win else 'Не красный ❌'}"
-        elif choice_key == "white":
             win = result in [2, 4]
-            text = f"Выпало {result} → {'Белый ✅' if win else 'Не белый ❌'}"
+            text = f"Выпало {result} → {'Красный сектор ✅' if win else 'Не красный ❌'}"
+        elif choice_key == "white":
+            win = result in [3, 5]
+            text = f"Выпало {result} → {'Белый сектор ✅' if win else 'Не белый ❌'}"
         elif choice_key == "bounce":
             win = result == 1
             text = f"Выпало {result} → {'Отскок ✅' if win else 'Не отскок ❌'}"
@@ -929,19 +944,20 @@ def check_win(game_key, choice_key, result):
             win = result in [2, 3, 4, 5]
             text = f"Выпало {result} → {'Любой сектор ✅' if win else 'Не сектор ❌'}"
         elif choice_key == "red_or_center":
-            win = result in [3, 5, 6]
-            text = f"Выпало {result} → {'Красный или Центр ✅' if win else '❌'}"
+            win = result in [2, 4, 6]
+            text = f"Выпало {result} → {'Красный или Центр ✅' if win else 'НЕ ✅ ❌'}"
         elif choice_key == "white_or_bounce":
-            win = result in [1, 2, 4]
-            text = f"Выпало {result} → {'Белый или Отскок ✅' if win else '❌'}"
+            win = result in [1, 3, 5]
+            text = f"Выпало {result} → {'Белый или Отскок ✅' if win else 'НЕ ✅ ❌'}"
 
+    # ===== БОУЛИНГ =====
     elif game_key == "bowling":
         if choice_key == "strike":
             win = result == 6
-            text = f"{result} → {'СТРАЙК ✅' if win else '❌'}"
+            text = f"Выпало {result} → {'СТРАЙК ✅' if win else 'Не страйк ❌'}"
         elif choice_key == "miss":
             win = result == 1
-            text = f"{result} → {'Промах ✅' if win else '❌'}"
+            text = f"Выпало {result} → {'Промах ✅' if win else 'Не промах ❌'}"
         elif choice_key == "p1":
             win = result == 1
             text = f"Сбито {result}/6 → {'✅' if win else '❌'}"
@@ -955,10 +971,11 @@ def check_win(game_key, choice_key, result):
             win = result == 5
             text = f"Сбито {result}/6 → {'✅' if win else '❌'}"
 
+    # ===== 777 =====
     elif game_key == "slot":
         if choice_key == "777":
             win = result == 64
-            text = f"{result} → {'ДЖЕКПОТ ✅' if win else '❌'}"
+            text = f"Выпало {result} → {'ДЖЕКПОТ ✅' if win else 'Не 777 ❌'}"
 
     return win, text
 
@@ -1176,7 +1193,6 @@ async def set_number(m: types.Message):
             except:
                 pass
         except Exception as e:
-            # Қатені жасырамыз, админге ғана жібереміз
             print(f"Вывод қатесі: {e}")
             try:
                 await bot.send_message(
