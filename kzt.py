@@ -11,6 +11,7 @@ from aiogram.types import (
     ReplyKeyboardMarkup, KeyboardButton
 )
 from aiocryptopay import AioCryptoPay, Networks
+from aiohttp import web
 
 # ==================== ТОКЕНДЕР ====================
 BOT_TOKEN = os.getenv("BOT_TOKEN", "")
@@ -25,7 +26,7 @@ BET_MIN = 0.1
 BET_MAX = 10000.0
 WITHDRAW_MIN = 1.0
 REF_PERCENT = 0.10
-HOUSE_EDGE = 0.08    # 8% комиссия от выигрыша
+HOUSE_EDGE = 0.05
 
 # ==================== ЛОГИКА ====================
 logging.basicConfig(level=logging.INFO)
@@ -105,6 +106,145 @@ def db_update_user(uid, **kwargs):
     cursor.execute(f"UPDATE users SET {fields} WHERE uid = ?", values)
     conn.commit()
     conn.close()
+
+
+# ==================== WEB API ====================
+async def api_profile(request):
+    try:
+        uid = int(request.query.get('uid', 0))
+    except:
+        return web.json_response({"error": "invalid uid"}, status=400)
+
+    if not uid:
+        return web.json_response({"error": "no uid"}, status=400)
+
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT username, balance, refs, games_played, total_bets, total_deposit FROM users WHERE uid = ?",
+        (uid,)
+    )
+    row = cursor.fetchone()
+    conn.close()
+
+    if not row:
+        return web.json_response({
+            "username": "Игрок", "balance": 0, "refs": 0,
+            "games": 0, "bets": 0, "deposit": 0,
+        })
+
+    return web.json_response({
+        "username": row[0], "balance": round(row[1], 2), "refs": row[2],
+        "games": row[3], "bets": round(row[4], 2), "deposit": round(row[5], 2),
+    })
+
+
+async def api_play(request):
+    try:
+        data = await request.json()
+    except:
+        return web.json_response({"error": "invalid json"}, status=400)
+
+    uid = int(data.get("uid", 0))
+    if not uid:
+        return web.json_response({"error": "no uid"}, status=400)
+
+    game = data.get("game", "?")
+    choice = data.get("choice", "?")
+    bet = float(data.get("bet", 0))
+    result = int(data.get("result", 0))
+    win = bool(data.get("win", False))
+    amount = float(data.get("amount", 0))
+    nick = data.get("nick", "Игрок")
+
+    if bet <= 0:
+        return web.json_response({"error": "invalid bet"}, status=400)
+
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT balance, total_bets, games_played, total_won FROM users WHERE uid = ?",
+        (uid,)
+    )
+    row = cursor.fetchone()
+
+    if not row:
+        cursor.execute("INSERT INTO users (uid, username) VALUES (?, ?)", (uid, nick))
+        conn.commit()
+        cursor.execute(
+            "SELECT balance, total_bets, games_played, total_won FROM users WHERE uid = ?",
+            (uid,)
+        )
+        row = cursor.fetchone()
+
+    new_balance = round(row[0] + amount, 2)
+    new_bets = round(row[1] + bet, 2)
+    new_games = row[2] + 1
+    new_won = round(row[3] + (amount if win else 0), 2)
+
+    if new_balance < 0:
+        new_balance = 0
+
+    cursor.execute(
+        "UPDATE users SET balance = ?, total_bets = ?, games_played = ?, total_won = ? WHERE uid = ?",
+        (new_balance, new_bets, new_games, new_won, uid)
+    )
+    conn.commit()
+    conn.close()
+
+    if CHANNEL_ID:
+        try:
+            if win:
+                await bot.send_message(
+                    CHANNEL_ID,
+                    f"✅ <b>ВЫИГРЫШ!</b>\n\n👤 <b>{nick}</b>\n🎮 Игра: {game}\n🎲 Результат: <b>{result}</b>\n💵 Ставка: <b>{bet}$</b>\n➕ Выигрыш: <b>+{round(amount, 2)}$</b>",
+                    parse_mode="HTML"
+                )
+            else:
+                await bot.send_message(
+                    CHANNEL_ID,
+                    f"❌ <b>ПРОИГРЫШ</b>\n\n👤 <b>{nick}</b>\n🎮 Игра: {game}\n🎲 Результат: <b>{result}</b>\n💵 Ставка: <b>{bet}$</b>",
+                    parse_mode="HTML"
+                )
+        except Exception as e:
+            print(f"Канал қатесі: {e}")
+
+    return web.json_response({"ok": True, "balance": new_balance})
+
+
+@web.middleware
+async def cors_middleware(request, handler):
+    if request.method == "OPTIONS":
+        response = web.Response()
+    else:
+        try:
+            response = await handler(request)
+        except web.HTTPException as ex:
+            response = ex
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+    return response
+
+
+async def start_web_server():
+    app = web.Application(middlewares=[cors_middleware])
+    app.router.add_get('/api/profile', api_profile)
+    app.router.add_post('/api/play', api_play)
+
+    async def health(request):
+        return web.Response(text="OK")
+
+    app.router.add_get('/', health)
+    app.router.add_get('/health', health)
+
+    runner = web.AppRunner(app)
+    await runner.setup()
+
+    port = int(os.getenv("PORT", 8080))
+    site = web.TCPSite(runner, '0.0.0.0', port)
+    await site.start()
+    print(f"🌐 API сервер іске қосылды: порт {port}")
 
 
 # ==================== ОЙЫНДАР ====================
@@ -874,18 +1014,8 @@ async def play_game(message, uid, game_key, choice_key, bet):
 
 
 def check_win(game_key, choice_key, result):
-    """
-    Telegram dice values:
-    🎲 dice: 1-6
-    ⚽ football: 1=промах, 2=штанга, 3=сейв, 4=гол, 5=гол
-    🏀 basketball: 1-3=промах, 4-5=гол
-    🎯 darts: 1=промах, 2=красный, 3=белый, 4=красный, 5=белый, 6=центр
-    🎳 bowling: 1-5=частично, 6=страйк
-    🎰 slot: 1-64, 64=777
-    """
     text, win = "", False
 
-    # ===== КОСТИ =====
     if game_key == "dice":
         if choice_key == "more3":
             win = result >= 5
@@ -895,14 +1025,12 @@ def check_win(game_key, choice_key, result):
             text = f"Выпало {result} → {'меньше 3 ✅' if win else 'НЕ меньше 3 ❌'}"
         elif choice_key == "even":
             win = result in [2, 6]
-            text = f"Выпало {result} → {'чётное (2,6) ✅' if win else 'НЕ чётное ❌'}"
+            text = f"Выпало {result} → {'чётное ✅' if win else 'НЕчётное ❌'}"
         elif choice_key == "odd":
             win = result in [1, 5]
-            text = f"Выпало {result} → {'нечётное (1,5) ✅' if win else 'НЕ нечётное ❌'}"
+            text = f"Выпало {result} → {'нечётное ✅' if win else 'Чётное ❌'}"
 
-    # ===== ФУТБОЛ =====
     elif game_key == "football":
-        # 1,2,3 = промах; 4,5 = гол
         is_goal = result >= 4
         if choice_key == "goal":
             win = is_goal
@@ -911,9 +1039,7 @@ def check_win(game_key, choice_key, result):
             win = not is_goal
             text = f"Выпало {result} → {'Промах ✅' if win else 'ГОЛ ❌'}"
 
-    # ===== БАСКЕТБОЛ =====
     elif game_key == "basketball":
-        # 1,2,3 = промах; 4,5 = гол
         is_goal = result >= 4
         if choice_key == "goal":
             win = is_goal
@@ -922,21 +1048,16 @@ def check_win(game_key, choice_key, result):
             win = not is_goal
             text = f"Выпало {result} → {'Промах ✅' if win else 'ГОЛ ❌'}"
 
-    # ===== ДАРТС (түзетілген) =====
     elif game_key == "darts":
-        # 1 = промах/отскок
-        # 2, 4 = КРАСНЫЕ сектора
-        # 3, 5 = БЕЛЫЕ сектора
-        # 6 = центр
         if choice_key == "center":
             win = result == 6
             text = f"Выпало {result} → {'ЦЕНТР ✅' if win else 'Не центр ❌'}"
         elif choice_key == "red":
             win = result in [2, 4]
-            text = f"Выпало {result} → {'Красный сектор ✅' if win else 'Не красный ❌'}"
+            text = f"Выпало {result} → {'Красный ✅' if win else 'Не красный ❌'}"
         elif choice_key == "white":
             win = result in [3, 5]
-            text = f"Выпало {result} → {'Белый сектор ✅' if win else 'Не белый ❌'}"
+            text = f"Выпало {result} → {'Белый ✅' if win else 'Не белый ❌'}"
         elif choice_key == "bounce":
             win = result == 1
             text = f"Выпало {result} → {'Отскок ✅' if win else 'Не отскок ❌'}"
@@ -945,19 +1066,18 @@ def check_win(game_key, choice_key, result):
             text = f"Выпало {result} → {'Любой сектор ✅' if win else 'Не сектор ❌'}"
         elif choice_key == "red_or_center":
             win = result in [2, 4, 6]
-            text = f"Выпало {result} → {'Красный или Центр ✅' if win else 'НЕ ✅ ❌'}"
+            text = f"Выпало {result} → {'Красный или Центр ✅' if win else '❌'}"
         elif choice_key == "white_or_bounce":
             win = result in [1, 3, 5]
-            text = f"Выпало {result} → {'Белый или Отскок ✅' if win else 'НЕ ✅ ❌'}"
+            text = f"Выпало {result} → {'Белый или Отскок ✅' if win else '❌'}"
 
-    # ===== БОУЛИНГ =====
     elif game_key == "bowling":
         if choice_key == "strike":
             win = result == 6
-            text = f"Выпало {result} → {'СТРАЙК ✅' if win else 'Не страйк ❌'}"
+            text = f"{result} → {'СТРАЙК ✅' if win else '❌'}"
         elif choice_key == "miss":
             win = result == 1
-            text = f"Выпало {result} → {'Промах ✅' if win else 'Не промах ❌'}"
+            text = f"{result} → {'Промах ✅' if win else '❌'}"
         elif choice_key == "p1":
             win = result == 1
             text = f"Сбито {result}/6 → {'✅' if win else '❌'}"
@@ -971,7 +1091,6 @@ def check_win(game_key, choice_key, result):
             win = result == 5
             text = f"Сбито {result}/6 → {'✅' if win else '❌'}"
 
-    # ===== 777 =====
     elif game_key == "slot":
         if choice_key == "777":
             win = result == 64
@@ -1220,6 +1339,7 @@ async def main():
     print("Бот:", me.username)
     print("Канал:", CHANNEL_ID)
     print("=" * 40)
+    asyncio.create_task(start_web_server())
     await dp.start_polling(bot)
 
 
