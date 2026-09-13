@@ -25,6 +25,7 @@ BET_MIN = 0.1
 BET_MAX = 10000.0
 WITHDRAW_MIN = 1.0
 REF_PERCENT = 0.10
+HOUSE_EDGE = 0.05    # 5% комиссия от выигрыша
 
 # ==================== ЛОГИКА ====================
 logging.basicConfig(level=logging.INFO)
@@ -38,7 +39,6 @@ except Exception as e:
     print("CryptoPay ҚАТЕ:", e)
     crypto = None
 
-# ==================== РОЗЫГРЫШТАР ====================
 giveaways = {}
 next_gid = [1]
 
@@ -107,56 +107,56 @@ def db_update_user(uid, **kwargs):
     conn.close()
 
 
-# ==================== ОЙЫНДАР ====================
+# ==================== ОЙЫНДАР (ШАНС АЗАЙТЫЛҒАН) ====================
 GAMES = {
     "dice": {
         "emoji": "🎲", "name": "Кости", "choices": {
-            "more3": {"name": "Больше (4-6)", "x": 2},
-            "less3": {"name": "Меньше (1-3)", "x": 2},
-            "even":  {"name": "Чётное (2,4,6)", "x": 2},
-            "odd":   {"name": "Нечётное (1,3,5)", "x": 2},
+            "more3": {"name": "Больше (5-6)", "x": 2},       # 33%
+            "less3": {"name": "Меньше (1-2)", "x": 2},       # 33%
+            "even":  {"name": "Чётное (2,6)", "x": 3},       # 33%
+            "odd":   {"name": "Нечётное (1,5)", "x": 3},     # 33%
         }
     },
     "football": {
         "emoji": "⚽", "name": "Футбол", "choices": {
-            "goal": {"name": "Гол", "x": 2},
-            "miss": {"name": "Промах", "x": 2},
+            "goal": {"name": "Гол", "x": 1.7},
+            "miss": {"name": "Промах", "x": 1.7},
         }
     },
     "basketball": {
         "emoji": "🏀", "name": "Баскетбол", "choices": {
-            "goal": {"name": "Гол", "x": 2},
-            "miss": {"name": "Промах", "x": 2},
+            "goal": {"name": "Гол", "x": 1.7},
+            "miss": {"name": "Промах", "x": 1.7},
         }
     },
     "darts": {
         "emoji": "🎯", "name": "Сектор",
         "rows": [["center", "red"], ["bounce", "white"], ["any_sector"], ["red_or_center"], ["white_or_bounce"]],
         "choices": {
-            "center":          {"name": "🎯 Центр", "x": 6},
-            "red":             {"name": "🔴 Сектор", "x": 3},
-            "bounce":          {"name": "🎯 Отскок", "x": 6},
-            "white":           {"name": "⚪ Сектор", "x": 3},
+            "center":          {"name": "🎯 Центр", "x": 5},
+            "red":             {"name": "🔴 Красный сектор", "x": 3},
+            "bounce":          {"name": "🎯 Отскок", "x": 5},
+            "white":           {"name": "⚪ Белый сектор", "x": 3},
             "any_sector":      {"name": "Любой сектор", "x": 1.5},
-            "red_or_center":   {"name": "🔴 Сектор или Центр", "x": 2},
-            "white_or_bounce": {"name": "⚪ Сектор или Отскок", "x": 2},
+            "red_or_center":   {"name": "🔴 Красный или Центр", "x": 2},
+            "white_or_bounce": {"name": "⚪ Белый или Отскок", "x": 2},
         }
     },
     "bowling": {
         "emoji": "🎳", "name": "Боулинг",
         "rows": [["strike", "miss"], ["p1", "p3"], ["p4", "p5"]],
         "choices": {
-            "strike": {"name": "🎳 Страйк", "x": 6},
-            "miss":   {"name": "🎳 Промах", "x": 6},
-            "p1":     {"name": "🎳 Сбито 1/6", "x": 6},
-            "p3":     {"name": "🎳 Сбито 3/6", "x": 6},
-            "p4":     {"name": "🎳 Сбито 4/6", "x": 6},
-            "p5":     {"name": "🎳 Сбито 5/6", "x": 6},
+            "strike": {"name": "🎳 Страйк", "x": 4},
+            "miss":   {"name": "🎳 Промах", "x": 4},
+            "p1":     {"name": "🎳 Сбито 1/6", "x": 4},
+            "p3":     {"name": "🎳 Сбито 3/6", "x": 4},
+            "p4":     {"name": "🎳 Сбито 4/6", "x": 4},
+            "p5":     {"name": "🎳 Сбито 5/6", "x": 4},
         }
     },
     "slot": {
         "emoji": "🎰", "name": "777", "choices": {
-            "777": {"name": "777 (Джекпот)", "x": 10},
+            "777": {"name": "777 (Джекпот)", "x": 7},
         }
     },
 }
@@ -257,29 +257,21 @@ async def cmd_start(m: types.Message):
     await m.answer("Меню 👇", reply_markup=bottom_menu())
 
 
-# ==================== РОЗЫГРЫШ (жаңа формат) ====================
+# ==================== РОЗЫГРЫШ ====================
 @dp.message(Command("giveaway"))
 async def cmd_giveaway(m: types.Message):
-    """
-    /giveaway [сумма] [мин_пополнение] [макс_участников]
-    Мысалы: /giveaway 10 3 50
-    """
     if m.from_user.id != ADMIN_ID:
         await m.answer("❌ У вас нет прав!")
         return
-
     args = m.text.split()
     if len(args) < 4:
         await m.answer(
             "📋 <b>Использование:</b>\n\n"
             "<code>/giveaway 10 3 50</code>\n\n"
-            "• 10 — призовой фонд ($)\n"
-            "• 3 — минимальная сумма пополнений ($)\n"
-            "• 50 — максимум участников",
+            "• 10 — приз ($)\n• 3 — мин. пополнение ($)\n• 50 — макс. участников",
             parse_mode="HTML"
         )
         return
-
     try:
         amount = float(args[1])
         min_dep = float(args[2])
@@ -287,29 +279,20 @@ async def cmd_giveaway(m: types.Message):
     except:
         await m.answer("❌ Неверный формат")
         return
-
     if not CHANNEL_ID:
-        await m.answer("❌ CHANNEL_ID не настроен в Railway Variables!")
+        await m.answer("❌ CHANNEL_ID не настроен!")
         return
-
     gid = next_gid[0]
     next_gid[0] += 1
-
     giveaways[gid] = {
-        "amount": amount,
-        "min_dep": min_dep,
+        "amount": amount, "min_dep": min_dep,
         "max_participants": max_participants,
-        "participants": [],
-        "active": True,
-        "message_id": None,
-        "chat_id": CHANNEL_ID,
+        "participants": [], "active": True,
+        "message_id": None, "chat_id": CHANNEL_ID,
     }
-
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="🎁 Участвовать", callback_data=f"gjoin_{gid}")]
     ])
-
-    # КАНАЛҒА ЖАРИЯЛАУ
     try:
         msg = await bot.send_message(
             CHANNEL_ID,
@@ -317,14 +300,14 @@ async def cmd_giveaway(m: types.Message):
             f"💰 Призовой фонд: <b>{amount}$</b>\n"
             f"📋 Минимум пополнений: <b>{min_dep}$</b>\n"
             f"👥 Максимум участников: <b>{max_participants}</b>\n\n"
-            f"❗ Для участия у вас должно быть пополнений на сумму не менее <b>{min_dep}$</b>\n\n"
-            f"👇 Нажмите кнопку для участия:",
+            f"❗ Для участия нужно пополнений на сумму ≥ <b>{min_dep}$</b>\n\n"
+            f"👇 Нажмите кнопку:",
             reply_markup=kb, parse_mode="HTML"
         )
         giveaways[gid]["message_id"] = msg.message_id
-        await m.answer(f"✅ Розыгрыш #{gid} опубликован в канале!")
+        await m.answer(f"✅ Розыгрыш #{gid} опубликован!")
     except Exception as e:
-        await m.answer(f"❌ Ошибка публикации в канал:\n<code>{e}</code>", parse_mode="HTML")
+        await m.answer(f"❌ Ошибка: <code>{e}</code>", parse_mode="HTML")
 
 
 @dp.callback_query(F.data.startswith("gjoin_"))
@@ -332,75 +315,46 @@ async def cb_giveaway_join(cb: types.CallbackQuery):
     gid = int(cb.data.replace("gjoin_", ""))
     uid = cb.from_user.id
     username = f"@{cb.from_user.username}" if cb.from_user.username else cb.from_user.first_name
-
     if gid not in giveaways or not giveaways[gid]["active"]:
         await cb.answer("❌ Розыгрыш завершён!", show_alert=True)
         return
-
     g = giveaways[gid]
-
-    # 1. Бұрын қатысқан ба?
     if uid in g["participants"]:
         await cb.answer("⚠️ Вы уже участвуете!", show_alert=True)
         return
-
-    # 2. Максимум участников?
     if len(g["participants"]) >= g["max_participants"]:
-        await cb.answer(f"❌ Мест нет! Максимум: {g['max_participants']}", show_alert=True)
+        await cb.answer(f"❌ Мест нет!", show_alert=True)
         return
-
-    # 3. Депозит тексеру
     u = get_user(uid, username)
     if u["total_deposit"] < g["min_dep"]:
         await cb.answer(
-            f"❌ Недостаточно пополнений!\n\n"
-            f"Нужно: {g['min_dep']}$\n"
-            f"У вас: {round(u['total_deposit'], 2)}$\n\n"
-            f"💡 Пополните баланс в боте!",
+            f"❌ Недостаточно пополнений!\n\nНужно: {g['min_dep']}$\nУ вас: {round(u['total_deposit'], 2)}$",
             show_alert=True
         )
         return
-
-    # ҚОСУ
     g["participants"].append(uid)
     await cb.answer("✅ Вы участвуете! Удачи! 🍀", show_alert=True)
-
-    # Жеке хабарлама жіберу
     try:
         await bot.send_message(
             uid,
-            f"🎉 <b>Вы участвуете в розыгрыше!</b>\n\n"
-            f"💰 Приз: <b>{g['amount']}$</b>\n"
-            f"👥 Участников: <b>{len(g['participants'])}/{g['max_participants']}</b>\n\n"
-            f"🍀 Удачи!",
+            f"🎉 <b>Вы участвуете!</b>\n\n💰 Приз: <b>{g['amount']}$</b>\n👥 {len(g['participants'])}/{g['max_participants']}",
             parse_mode="HTML"
         )
     except:
         pass
-
-    # Админге хабарлау
     try:
         await bot.send_message(
             ADMIN_ID,
-            f"🎁 <b>Новый участник!</b>\n\n"
-            f"👤 {username}\n"
-            f"💰 Пополнений: {round(u['total_deposit'], 2)}$\n"
-            f"👥 Всего: {len(g['participants'])}/{g['max_participants']}",
+            f"🎁 <b>Новый участник!</b>\n👤 {username}\n💰 {round(u['total_deposit'], 2)}$\n👥 {len(g['participants'])}/{g['max_participants']}",
             parse_mode="HTML"
         )
     except:
         pass
-
-    # Каналдағы хабарламаны жаңарту
     try:
         kb = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text=f"🎁 Участвовать ({len(g['participants'])}/{g['max_participants']})", callback_data=f"gjoin_{gid}")]
         ])
-        await bot.edit_message_reply_markup(
-            chat_id=g["chat_id"],
-            message_id=g["message_id"],
-            reply_markup=kb
-        )
+        await bot.edit_message_reply_markup(chat_id=g["chat_id"], message_id=g["message_id"], reply_markup=kb)
     except:
         pass
 
@@ -410,7 +364,6 @@ async def cmd_endgiveaway(m: types.Message):
     if m.from_user.id != ADMIN_ID:
         await m.answer("❌ У вас нет прав!")
         return
-
     args = m.text.split()
     if len(args) < 2:
         active_gids = [gid for gid, g in giveaways.items() if g["active"]]
@@ -424,59 +377,43 @@ async def cmd_endgiveaway(m: types.Message):
         except:
             await m.answer("❌ Формат: /endgiveaway <ID>")
             return
-
     if gid not in giveaways:
         await m.answer("❌ Розыгрыш табылмады")
         return
-
     g = giveaways[gid]
     if not g["active"]:
         await m.answer("❌ Розыгрыш уже завершён")
         return
-
     if not g["participants"]:
         g["active"] = False
         await m.answer("❌ Никто не участвовал")
         return
-
     winner_uid = random.choice(g["participants"])
     winner = get_user(winner_uid)
     winner_name = winner.get("username", f"Player{winner_uid % 10000}")
-
     new_balance = round(winner["balance"] + g["amount"], 2)
     db_update_user(winner_uid, balance=new_balance)
-
     g["active"] = False
-
     await m.answer(
         f"🎉 <b>РОЗЫГРЫШ #{gid} ЗАВЕРШЁН!</b>\n\n"
         f"💰 Приз: <b>{g['amount']}$</b>\n"
         f"👥 Участников: <b>{len(g['participants'])}</b>\n\n"
-        f"🏆 <b>ПОБЕДИТЕЛЬ: {winner_name}</b>\n"
-        f"💰 Новый баланс: <b>{new_balance}$</b>",
+        f"🏆 <b>{winner_name}</b>\n💰 Новый баланс: <b>{new_balance}$</b>",
         parse_mode="HTML"
     )
-
     try:
         await bot.send_message(
             winner_uid,
-            f"🎉 <b>ПОЗДРАВЛЯЕМ!</b>\n\n"
-            f"🏆 Вы выиграли розыгрыш #{gid}!\n"
-            f"💰 Приз: <b>+{g['amount']}$</b>\n"
-            f"💵 Новый баланс: <b>{new_balance}$</b>",
+            f"🎉 <b>ПОЗДРАВЛЯЕМ!</b>\n\n🏆 Розыгрыш #{gid}\n💰 Приз: <b>+{g['amount']}$</b>\n💵 Баланс: <b>{new_balance}$</b>",
             parse_mode="HTML"
         )
     except:
         pass
-
     if CHANNEL_ID:
         try:
             await bot.send_message(
                 CHANNEL_ID,
-                f"🎉 <b>РОЗЫГРЫШ #{gid} ЗАВЕРШЁН!</b>\n\n"
-                f"💰 Приз: <b>{g['amount']}$</b>\n"
-                f"🏆 Победитель: <b>{winner_name}</b>\n\n"
-                f"🎊 Поздравляем!",
+                f"🎉 <b>РОЗЫГРЫШ #{gid} ЗАВЕРШЁН!</b>\n\n💰 Приз: <b>{g['amount']}$</b>\n🏆 Победитель: <b>{winner_name}</b>\n\n🎊 Поздравляем!",
                 parse_mode="HTML"
             )
         except:
@@ -488,19 +425,16 @@ async def cmd_giveaways(m: types.Message):
     if m.from_user.id != ADMIN_ID:
         await m.answer("❌ У вас нет прав!")
         return
-
     active = [(gid, g) for gid, g in giveaways.items() if g["active"]]
     if not active:
         await m.answer("📭 Активных розыгрышей нет")
         return
-
     text = "🎁 <b>АКТИВНЫЕ РОЗЫГРЫШИ</b>\n\n"
     for gid, g in active:
         text += (
-            f"<b>#{gid}</b>\n"
-            f"💰 Приз: {g['amount']}$\n"
-            f"📋 Мин. депозит: {g['min_dep']}$\n"
-            f"👥 Участников: {len(g['participants'])}/{g['max_participants']}\n\n"
+            f"<b>#{gid}</b>\n💰 {g['amount']}$\n"
+            f"📋 Мин: {g['min_dep']}$\n"
+            f"👥 {len(g['participants'])}/{g['max_participants']}\n\n"
         )
     text += "Аяқтау: <code>/endgiveaway ID</code>"
     await m.answer(text, parse_mode="HTML")
@@ -512,9 +446,7 @@ async def cmd_bonus(m: types.Message):
     if m.from_user.id != ADMIN_ID:
         await m.answer("❌ У вас нет прав!")
         return
-
     args = m.text.split()
-
     if m.reply_to_message:
         if len(args) < 2:
             await m.answer("❌ Использование: <code>/bonus 10</code>", parse_mode="HTML")
@@ -539,7 +471,6 @@ async def cmd_bonus(m: types.Message):
         except:
             pass
         return
-
     if len(args) < 3:
         await m.answer(
             "📋 <b>Использование:</b>\n\n"
@@ -548,28 +479,23 @@ async def cmd_bonus(m: types.Message):
             parse_mode="HTML"
         )
         return
-
     target_username = args[1]
     if not target_username.startswith("@"):
         await m.answer("❌ Username @ арқылы басталуы керек")
         return
-
     try:
         amount = float(args[2])
     except:
         await m.answer("❌ Неверная сумма")
         return
-
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("SELECT uid, username, balance FROM users WHERE LOWER(username) = ?", (target_username.lower(),))
     row = cursor.fetchone()
     conn.close()
-
     if row is None:
         await m.answer(f"❌ <b>{target_username}</b> не найден!", parse_mode="HTML")
         return
-
     target_uid, target_name, target_balance = row
     new_balance = round(target_balance + amount, 2)
     db_update_user(target_uid, balance=new_balance)
@@ -898,30 +824,44 @@ async def play_game(message, uid, game_key, choice_key, bet):
     new_games = u.get("games_played", 0) + 1
 
     if is_win:
-        win = round(bet * choice["x"], 2)
+        win_full = round(bet * choice["x"], 2)
+        commission = round(win_full * HOUSE_EDGE, 2)   # 5% комиссия
+        win = round(win_full - commission, 2)          # Қолына тиетін
         new_balance = round(u["balance"] - bet + win, 2)
         new_total_won = round(u.get("total_won", 0) + win, 2)
         db_update_user(uid, balance=new_balance, total_bets=new_total_bets, games_played=new_games, total_won=new_total_won)
         text = (
-            f"🎉 <b>ПОБЕДА!</b>\n\n{g['emoji']} {g['name']} — {choice['name']}\n"
-            f"<i>{result_text}</i>\n\n➕ Выигрыш: <b>+{win}$</b>\n💰 Баланс: <b>{new_balance}$</b>"
+            f"🎉 <b>ПОБЕДА!</b>\n\n"
+            f"{g['emoji']} {g['name']} — {choice['name']}\n"
+            f"<i>{result_text}</i>\n\n"
+            f"➕ Выигрыш: <b>+{win}$</b>\n"
+            f"💰 Баланс: <b>{new_balance}$</b>"
         )
         channel_text = (
-            f"✅ <b>ВЫИГРЫШ!</b>\n\n👤 <b>{nick}</b>\n"
+            f"✅ <b>ВЫИГРЫШ!</b>\n\n"
+            f"👤 <b>{nick}</b>\n"
             f"🎮 {g['emoji']} {g['name']} — {choice['name']}\n"
-            f"🎲 {result}\n💵 Ставка: {bet}$\n➕ Выигрыш: +{win}$ (x{choice['x']})"
+            f"🎲 Результат: <b>{result}</b>\n"
+            f"💵 Ставка: <b>{bet}$</b>\n"
+            f"➕ Выигрыш: <b>+{win}$</b> (x{choice['x']})"
         )
     else:
         new_balance = round(u["balance"] - bet, 2)
         db_update_user(uid, balance=new_balance, total_bets=new_total_bets, games_played=new_games)
         text = (
-            f"😢 <b>ПРОИГРЫШ</b>\n\n{g['emoji']} {g['name']} — {choice['name']}\n"
-            f"<i>{result_text}</i>\n\n➖ Проигрыш: <b>-{bet}$</b>\n💰 Баланс: <b>{new_balance}$</b>"
+            f"😢 <b>ПРОИГРЫШ</b>\n\n"
+            f"{g['emoji']} {g['name']} — {choice['name']}\n"
+            f"<i>{result_text}</i>\n\n"
+            f"➖ Проигрыш: <b>-{bet}$</b>\n"
+            f"💰 Баланс: <b>{new_balance}$</b>"
         )
         channel_text = (
-            f"❌ <b>ПРОИГРЫШ</b>\n\n👤 <b>{nick}</b>\n"
+            f"❌ <b>ПРОИГРЫШ</b>\n\n"
+            f"👤 <b>{nick}</b>\n"
             f"🎮 {g['emoji']} {g['name']} — {choice['name']}\n"
-            f"🎲 {result}\n💵 Ставка: {bet}$\n➖ Проигрыш: -{bet}$"
+            f"🎲 Результат: <b>{result}</b>\n"
+            f"💵 Ставка: <b>{bet}$</b>\n"
+            f"➖ Проигрыш: <b>-{bet}$</b>"
         )
 
     await message.answer(text, parse_mode="HTML", reply_markup=main_menu(uid))
@@ -937,40 +877,88 @@ def check_win(game_key, choice_key, result):
     text, win = "", False
 
     if game_key == "dice":
-        if choice_key == "more3": win = result >= 4; text = f"Выпало {result} → {'больше 3 ✅' if win else 'НЕ больше 3 ❌'}"
-        elif choice_key == "less3": win = result <= 3; text = f"Выпало {result} → {'меньше 3 ✅' if win else 'НЕ меньше 3 ❌'}"
-        elif choice_key == "even": win = result % 2 == 0; text = f"Выпало {result} → {'чётное ✅' if win else 'НЕчётное ❌'}"
-        elif choice_key == "odd": win = result % 2 == 1; text = f"Выпало {result} → {'нечётное ✅' if win else 'Чётное ❌'}"
+        if choice_key == "more3":
+            win = result >= 5
+            text = f"Выпало {result} → {'больше 4 ✅' if win else 'НЕ больше 4 ❌'}"
+        elif choice_key == "less3":
+            win = result <= 2
+            text = f"Выпало {result} → {'меньше 3 ✅' if win else 'НЕ меньше 3 ❌'}"
+        elif choice_key == "even":
+            win = result in [2, 6]
+            text = f"Выпало {result} → {'чётное ✅' if win else 'НЕчётное ❌'}"
+        elif choice_key == "odd":
+            win = result in [1, 5]
+            text = f"Выпало {result} → {'нечётное ✅' if win else 'Чётное ❌'}"
 
     elif game_key == "football":
         is_goal = result >= 3
-        if choice_key == "goal": win = is_goal; text = f"Выпало {result} → {'ГОЛ ✅' if win else 'Промах ❌'}"
-        elif choice_key == "miss": win = not is_goal; text = f"Выпало {result} → {'Промах ✅' if win else 'ГОЛ ❌'}"
+        if choice_key == "goal":
+            win = is_goal
+            text = f"Выпало {result} → {'ГОЛ ✅' if win else 'Промах ❌'}"
+        elif choice_key == "miss":
+            win = not is_goal
+            text = f"Выпало {result} → {'Промах ✅' if win else 'ГОЛ ❌'}"
 
     elif game_key == "basketball":
         is_goal = result >= 3
-        if choice_key == "goal": win = is_goal; text = f"Выпало {result} → {'ГОЛ ✅' if win else 'Промах ❌'}"
-        elif choice_key == "miss": win = not is_goal; text = f"Выпало {result} → {'Промах ✅' if win else 'ГОЛ ❌'}"
+        if choice_key == "goal":
+            win = is_goal
+            text = f"Выпало {result} → {'ГОЛ ✅' if win else 'Промах ❌'}"
+        elif choice_key == "miss":
+            win = not is_goal
+            text = f"Выпало {result} → {'Промах ✅' if win else 'ГОЛ ❌'}"
 
     elif game_key == "darts":
-        if choice_key == "center": win = result == 6; text = f"Выпало {result} → {'ЦЕНТР ✅' if win else 'Не центр ❌'}"
-        elif choice_key == "red": win = result in [4, 5]; text = f"Выпало {result} → {'Красный ✅' if win else 'Не красный ❌'}"
-        elif choice_key == "white": win = result in [2, 3]; text = f"Выпало {result} → {'Белый ✅' if win else 'Не белый ❌'}"
-        elif choice_key == "bounce": win = result == 1; text = f"Выпало {result} → {'Отскок ✅' if win else 'Не отскок ❌'}"
-        elif choice_key == "any_sector": win = result in [2, 3, 4, 5]; text = f"Выпало {result} → {'Любой сектор ✅' if win else 'Не сектор ❌'}"
-        elif choice_key == "red_or_center": win = result in [4, 5, 6]; text = f"Выпало {result} → {'✅' if win else '❌'}"
-        elif choice_key == "white_or_bounce": win = result in [1, 2, 3]; text = f"Выпало {result} → {'✅' if win else '❌'}"
+        # 1 = промах/отскок
+        # 2, 4 = БЕЛЫЕ сектора
+        # 3, 5 = КРАСНЫЕ сектора
+        # 6 = центр
+        if choice_key == "center":
+            win = result == 6
+            text = f"Выпало {result} → {'ЦЕНТР ✅' if win else 'Не центр ❌'}"
+        elif choice_key == "red":
+            win = result in [3, 5]
+            text = f"Выпало {result} → {'Красный ✅' if win else 'Не красный ❌'}"
+        elif choice_key == "white":
+            win = result in [2, 4]
+            text = f"Выпало {result} → {'Белый ✅' if win else 'Не белый ❌'}"
+        elif choice_key == "bounce":
+            win = result == 1
+            text = f"Выпало {result} → {'Отскок ✅' if win else 'Не отскок ❌'}"
+        elif choice_key == "any_sector":
+            win = result in [2, 3, 4, 5]
+            text = f"Выпало {result} → {'Любой сектор ✅' if win else 'Не сектор ❌'}"
+        elif choice_key == "red_or_center":
+            win = result in [3, 5, 6]
+            text = f"Выпало {result} → {'Красный или Центр ✅' if win else '❌'}"
+        elif choice_key == "white_or_bounce":
+            win = result in [1, 2, 4]
+            text = f"Выпало {result} → {'Белый или Отскок ✅' if win else '❌'}"
 
     elif game_key == "bowling":
-        if choice_key == "strike": win = result == 6; text = f"{result} → {'СТРАЙК ✅' if win else '❌'}"
-        elif choice_key == "miss": win = result == 1; text = f"{result} → {'Промах ✅' if win else '❌'}"
-        elif choice_key == "p1": win = result == 1; text = f"Сбито {result}/6 → {'✅' if win else '❌'}"
-        elif choice_key == "p3": win = result == 3; text = f"Сбито {result}/6 → {'✅' if win else '❌'}"
-        elif choice_key == "p4": win = result == 4; text = f"Сбито {result}/6 → {'✅' if win else '❌'}"
-        elif choice_key == "p5": win = result == 5; text = f"Сбито {result}/6 → {'✅' if win else '❌'}"
+        if choice_key == "strike":
+            win = result == 6
+            text = f"{result} → {'СТРАЙК ✅' if win else '❌'}"
+        elif choice_key == "miss":
+            win = result == 1
+            text = f"{result} → {'Промах ✅' if win else '❌'}"
+        elif choice_key == "p1":
+            win = result == 1
+            text = f"Сбито {result}/6 → {'✅' if win else '❌'}"
+        elif choice_key == "p3":
+            win = result == 3
+            text = f"Сбито {result}/6 → {'✅' if win else '❌'}"
+        elif choice_key == "p4":
+            win = result == 4
+            text = f"Сбито {result}/6 → {'✅' if win else '❌'}"
+        elif choice_key == "p5":
+            win = result == 5
+            text = f"Сбито {result}/6 → {'✅' if win else '❌'}"
 
     elif game_key == "slot":
-        if choice_key == "777": win = result == 64; text = f"{result} → {'ДЖЕКПОТ ✅' if win else '❌'}"
+        if choice_key == "777":
+            win = result == 64
+            text = f"{result} → {'ДЖЕКПОТ ✅' if win else '❌'}"
 
     return win, text
 
@@ -1129,8 +1117,12 @@ async def set_number(m: types.Message):
     if state.get("pending_game"):
         pg = state["pending_game"]
         game_key, choice_key = pg["game_key"], pg["choice_key"]
-        if val < BET_MIN: await m.answer(f"❌ Мин: {BET_MIN}$"); return
-        if val > BET_MAX: await m.answer(f"❌ Макс: {BET_MAX}$"); return
+        if val < BET_MIN:
+            await m.answer(f"❌ Мин: {BET_MIN}$")
+            return
+        if val > BET_MAX:
+            await m.answer(f"❌ Макс: {BET_MAX}$")
+            return
         if val > u["balance"]:
             await m.answer(f"❌ Недостаточно! Нужно: {val}$\nУ вас: {u['balance']}$", parse_mode="HTML")
             return
@@ -1139,20 +1131,37 @@ async def set_number(m: types.Message):
         return
 
     if state.get("await_dep"):
-        if val < 1: await m.answer("❌ Мин: 1$"); return
-        if val > 10000: await m.answer("❌ Макс: 10000$"); return
+        if val < 1:
+            await m.answer("❌ Мин: 1$")
+            return
+        if val > 10000:
+            await m.answer("❌ Макс: 10000$")
+            return
         state["await_dep"] = False
         await create_deposit_invoice(m, uid, val)
         return
 
     if state.get("await_withdraw"):
         state["await_withdraw"] = False
-        if val < WITHDRAW_MIN: await m.answer(f"❌ Мин: {WITHDRAW_MIN}$"); return
-        if val > u["balance"]: await m.answer(f"❌ Баланс: {u['balance']}$"); return
-        if crypto is None: await m.answer("❌ CryptoPay недоступен"); return
+        if val < WITHDRAW_MIN:
+            await m.answer(f"❌ Мин: {WITHDRAW_MIN}$")
+            return
+        if val > u["balance"]:
+            await m.answer(f"❌ Баланс: {u['balance']}$")
+            return
+        if crypto is None:
+            await m.answer(
+                "❌ <b>Вывод временно не работает</b>\n\n"
+                "🔧 Извините за неудобства.\n"
+                "💡 Попробуйте позже.",
+                parse_mode="HTML"
+            )
+            return
         await m.answer("⏳ Создаём чек...")
         try:
-            check = await crypto.create_check(asset="USDT", amount=round(val, 2), pin_to_user_id=uid)
+            check = await crypto.create_check(
+                asset="USDT", amount=round(val, 2), pin_to_user_id=uid
+            )
             new_balance = round(u["balance"] - val, 2)
             db_update_user(uid, balance=new_balance)
             kb = InlineKeyboardMarkup(inline_keyboard=[
@@ -1167,7 +1176,22 @@ async def set_number(m: types.Message):
             except:
                 pass
         except Exception as e:
-            await m.answer(f"❌ Ошибка: <code>{e}</code>", parse_mode="HTML")
+            # Қатені жасырамыз, админге ғана жібереміз
+            print(f"Вывод қатесі: {e}")
+            try:
+                await bot.send_message(
+                    ADMIN_ID,
+                    f"⚠️ <b>Ошибка вывода</b>\n\n👤 {username}\n💰 {val}$\n❌ <code>{e}</code>",
+                    parse_mode="HTML"
+                )
+            except:
+                pass
+            await m.answer(
+                "❌ <b>Вывод временно не работает</b>\n\n"
+                "🔧 Извините за неудобства.\n"
+                "💡 Попробуйте позже или напишите в поддержку.",
+                parse_mode="HTML"
+            )
         return
 
 
