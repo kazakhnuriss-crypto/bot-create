@@ -18,7 +18,7 @@ CRYPTO_TOKEN = os.getenv("CRYPTO_TOKEN", "")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
 CHANNEL_ID = int(os.getenv("CHANNEL_ID", "0"))
 CHAT_LINK = os.getenv("CHAT_LINK", "")
-DB_PATH = os.getenv("DB_PATH", "bot.db")
+DB_PATH = os.getenv("DB_PATH", "/data/bot.db")
 
 BET_MIN = 0.1
 BET_MAX = 10000
@@ -39,14 +39,24 @@ dp = Dispatcher()
 crypto = None
 try:
     crypto = AioCryptoPay(token=CRYPTO_TOKEN, network=Networks.MAIN_NET)
+    print("✅ CryptoPay OK")
 except Exception as e:
-    print(f"CryptoPay: {e}")
+    print(f"❌ CryptoPay: {e}")
 
 mines_state = {}
 awaiting = {}
 
+
 # ==================== DB ====================
 def db_init():
+    db_dir = os.path.dirname(DB_PATH)
+    if db_dir and not os.path.exists(db_dir):
+        try:
+            os.makedirs(db_dir, exist_ok=True)
+            print(f"📁 Папка создана: {db_dir}")
+        except Exception as e:
+            print(f"⚠️ Не удалось создать папку: {e}")
+
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("""CREATE TABLE IF NOT EXISTS users (
@@ -56,9 +66,20 @@ def db_init():
         total_deposit REAL DEFAULT 0)""")
     c.execute("""CREATE TABLE IF NOT EXISTS multichecks (
         code TEXT PRIMARY KEY, total REAL, slots INTEGER, per_user REAL,
-        claimed INTEGER DEFAULT 0, activated_by TEXT DEFAULT '',
-        creator INTEGER, active INTEGER DEFAULT 1, created TEXT)""")
-    conn.commit(); conn.close()
+        min_turnover REAL DEFAULT 0, claimed INTEGER DEFAULT 0,
+        activated_by TEXT DEFAULT '', creator INTEGER, active INTEGER DEFAULT 1,
+        created TEXT)""")
+    conn.commit()
+
+    c.execute("SELECT COUNT(*) FROM users")
+    uc = c.fetchone()[0]
+    c.execute("SELECT COUNT(*) FROM multichecks")
+    mc = c.fetchone()[0]
+    conn.close()
+
+    print(f"📁 Дерекқор: {DB_PATH}")
+    print(f"👥 Игроков: {uc} | 🎫 Чеков: {mc}")
+
 
 def db_get(uid, username=None):
     conn = sqlite3.connect(DB_PATH)
@@ -79,18 +100,22 @@ def db_get(uid, username=None):
             "refs": row[4], "total_bets": row[5], "games_played": row[6],
             "total_won": row[7], "total_deposit": row[8]} if row else None
 
+
 def db_upd(uid, **kw):
     if not kw: return
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     f = ", ".join(f"{k}=?" for k in kw)
     c.execute(f"UPDATE users SET {f} WHERE uid=?", list(kw.values()) + [uid])
-    conn.commit(); conn.close()
+    conn.commit()
+    conn.close()
+
 
 def fmt(b): return f"{b:.2f}"
 def uname(u): return f"@{u.username}" if u.username else u.first_name
 
-# ==================== REPLY KEYBOARD ====================
+
+# ==================== KEYBOARDS ====================
 def reply_kb(uid):
     kb = [
         [KeyboardButton(text="🎮  Играть"), KeyboardButton(text="🏆  Топ")],
@@ -100,15 +125,15 @@ def reply_kb(uid):
         kb.append([KeyboardButton(text="👑  Админ-панель")])
     return ReplyKeyboardMarkup(keyboard=kb, resize_keyboard=True)
 
-# ==================== INLINE KEYBOARDS ====================
+
 def kb_games():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="💣  Мина", callback_data="mines"),
          InlineKeyboardButton(text="🎲  Кости", callback_data="dice")],
         [InlineKeyboardButton(text="🎳  Боулинг", callback_data="bowling"),
          InlineKeyboardButton(text="🎯  Дартс", callback_data="darts")],
-        [InlineKeyboardButton(text="🎫  Активировать чек", callback_data="claim_check")],
     ])
+
 
 def kb_mines_lvl():
     return InlineKeyboardMarkup(inline_keyboard=[
@@ -117,6 +142,7 @@ def kb_mines_lvl():
         [InlineKeyboardButton(text="🔴  5 мин   ·   x3.00 – x6.00", callback_data="mines_l_5")],
         [InlineKeyboardButton(text="⬅️  Назад", callback_data="menu_games")],
     ])
+
 
 def kb_mines_field(game, show_mines=False):
     rows = []
@@ -138,6 +164,7 @@ def kb_mines_field(game, show_mines=False):
         rows.append([InlineKeyboardButton(text="❌  Отмена", callback_data="mines_cancel")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
+
 def kb_dice():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="Больше (4-6)   ·   x2", callback_data="dice_more3")],
@@ -147,6 +174,7 @@ def kb_dice():
         [InlineKeyboardButton(text="⬅️  Назад", callback_data="menu_games")],
     ])
 
+
 def kb_bowl():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="❌  Промах   ·   x3", callback_data="bowl_miss"),
@@ -154,6 +182,7 @@ def kb_bowl():
         [InlineKeyboardButton(text="🎯  Угадать часть сбитых   ·   x5", callback_data="bowl_portion")],
         [InlineKeyboardButton(text="⬅️  Назад", callback_data="menu_games")],
     ])
+
 
 def kb_bowl_portion():
     return InlineKeyboardMarkup(inline_keyboard=[
@@ -165,6 +194,7 @@ def kb_bowl_portion():
         [InlineKeyboardButton(text="⬅️  Назад", callback_data="bowling")],
     ])
 
+
 def kb_darts():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="🔴  Красный   ·   x2", callback_data="darts_red"),
@@ -174,6 +204,7 @@ def kb_darts():
         [InlineKeyboardButton(text="⬅️  Назад", callback_data="menu_games")],
     ])
 
+
 def kb_top():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="💰  По балансу", callback_data="top_bal"),
@@ -181,12 +212,13 @@ def kb_top():
         [InlineKeyboardButton(text="👥  По рефералам", callback_data="top_r")],
     ])
 
+
 def kb_balance_menu():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="💳  Пополнить", callback_data="deposit"),
          InlineKeyboardButton(text="📤  Вывести", callback_data="withdraw")],
-        [InlineKeyboardButton(text="🎫  Активировать чек", callback_data="claim_check")],
     ])
+
 
 def kb_profile_menu():
     return InlineKeyboardMarkup(inline_keyboard=[
@@ -194,15 +226,17 @@ def kb_profile_menu():
          InlineKeyboardButton(text="📊  Моя статистика", callback_data="my_stats")],
     ])
 
+
 def kb_admin():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="📊  Статистика", callback_data="ad_stats"),
          InlineKeyboardButton(text="👥  Все игроки", callback_data="ad_users")],
-        [InlineKeyboardButton(text="🎫  Создать МультиЧек", callback_data="ad_multicheck"),
+        [InlineKeyboardButton(text="🎫  МультиЧек", callback_data="ad_multicheck"),
          InlineKeyboardButton(text="🎁  Бонус Чек", callback_data="ad_bonuscheck")],
         [InlineKeyboardButton(text="📋  Активные чеки", callback_data="ad_checks")],
         [InlineKeyboardButton(text="💬  Помощь", callback_data="ad_help")],
     ])
+
 
 def kb_dep():
     return InlineKeyboardMarkup(inline_keyboard=[
@@ -214,6 +248,7 @@ def kb_dep():
          InlineKeyboardButton(text="✏️  Своя", callback_data="dep_custom")],
         [InlineKeyboardButton(text="⬅️  Назад", callback_data="menu_balance")],
     ])
+
 
 # ==================== START ====================
 @dp.message(Command("start"))
@@ -233,12 +268,13 @@ async def cmd_start(m: types.Message):
                 except: pass
         except: pass
     await m.answer(
-        f"🎰  <b>BET GAMES</b>\n\n"
+        f"🎰  <b>STAVKA BOT</b>\n\n"
         f"👋  Привет, <b>{name}</b>!\n\n"
         f"💰  Баланс: <b>{fmt(u['balance'])}$</b>\n\n"
         f"Выбери действие ниже 👇",
         reply_markup=reply_kb(uid), parse_mode="HTML"
     )
+
 
 # ==================== REPLY BUTTONS ====================
 @dp.message(F.text.contains("Играть"))
@@ -252,9 +288,11 @@ async def btn_play(m: types.Message):
         reply_markup=kb_games(), parse_mode="HTML"
     )
 
+
 @dp.message(F.text.contains("Топ"))
 async def btn_top(m: types.Message):
     await m.answer("🏆  <b>Топы игроков</b>", reply_markup=kb_top(), parse_mode="HTML")
+
 
 @dp.message(F.text.contains("Баланс"))
 async def btn_bal(m: types.Message):
@@ -266,6 +304,7 @@ async def btn_bal(m: types.Message):
         f"Что хотите сделать?",
         reply_markup=kb_balance_menu(), parse_mode="HTML"
     )
+
 
 @dp.message(F.text.contains("Профиль"))
 async def btn_prof(m: types.Message):
@@ -280,10 +319,12 @@ async def btn_prof(m: types.Message):
         reply_markup=kb_profile_menu(), parse_mode="HTML"
     )
 
+
 @dp.message(F.text.contains("Админ-панель"))
 async def btn_admin(m: types.Message):
     if m.from_user.id != ADMIN_ID: return
     await m.answer("👑  <b>Админ-панель</b>", reply_markup=kb_admin(), parse_mode="HTML")
+
 
 # ==================== MENU CALLBACKS ====================
 @dp.callback_query(F.data == "menu_games")
@@ -298,6 +339,7 @@ async def cb_menu_games(cb: types.CallbackQuery):
     )
     await cb.answer()
 
+
 @dp.callback_query(F.data == "menu_balance")
 async def cb_menu_bal(cb: types.CallbackQuery):
     uid = cb.from_user.id
@@ -307,6 +349,7 @@ async def cb_menu_bal(cb: types.CallbackQuery):
         reply_markup=kb_balance_menu(), parse_mode="HTML"
     )
     await cb.answer()
+
 
 @dp.callback_query(F.data == "my_stats")
 async def cb_my_stats(cb: types.CallbackQuery):
@@ -323,6 +366,7 @@ async def cb_my_stats(cb: types.CallbackQuery):
     )
     await cb.answer()
 
+
 @dp.callback_query(F.data == "ref_link")
 async def cb_ref_link(cb: types.CallbackQuery):
     uid = cb.from_user.id
@@ -338,84 +382,6 @@ async def cb_ref_link(cb: types.CallbackQuery):
     )
     await cb.answer()
 
-# ==================== CHECK / CLAIM ====================
-@dp.callback_query(F.data == "claim_check")
-async def cb_claim_check(cb: types.CallbackQuery):
-    uid = cb.from_user.id
-    awaiting[uid] = {"claim_check": True}
-    await cb.message.answer(
-        "🎫  <b>Активация чека</b>\n\n"
-        "✏️ Введи код чека:\n\n"
-        "Например: <code>MC-ABC123</code>",
-        parse_mode="HTML"
-    )
-    await cb.answer()
-
-async def do_claim_check(msg, uid, code):
-    code = code.upper().strip()
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("SELECT total, slots, per_user, claimed, activated_by, active FROM multichecks WHERE code=?", (code,))
-    row = c.fetchone()
-    
-    if not row:
-        conn.close()
-        await msg.answer("❌ <b>Чек не найден</b>\n\nПроверь код и попробуй снова.", parse_mode="HTML")
-        return
-    
-    total, slots, per_user, claimed, activated_by, active = row
-    
-    if not active:
-        conn.close()
-        await msg.answer("❌ <b>Чек уже неактивен</b>", parse_mode="HTML")
-        return
-    
-    activated_list = activated_by.split(",") if activated_by else []
-    if str(uid) in activated_list:
-        conn.close()
-        await msg.answer("⚠️ <b>Вы уже активировали этот чек!</b>", parse_mode="HTML")
-        return
-    
-    if claimed >= slots:
-        conn.close()
-        await msg.answer("❌ <b>Все слоты заполнены!</b>", parse_mode="HTML")
-        return
-    
-    # Активация
-    new_claimed = claimed + 1
-    activated_list.append(str(uid))
-    new_activated = ",".join(activated_list)
-    new_active = 1 if new_claimed < slots else 0
-    
-    c.execute("UPDATE multichecks SET claimed=?, activated_by=?, active=? WHERE code=?",
-              (new_claimed, new_activated, new_active, code))
-    conn.commit()
-    conn.close()
-    
-    # Начисляем баланс
-    u = db_get(uid)
-    nb = round(u["balance"] + per_user, 2)
-    db_upd(uid, balance=nb)
-    
-    await msg.answer(
-        f"🎉  <b>Чек активирован!</b>\n\n"
-        f"💵  Получено: <b>+{fmt(per_user)}$</b>\n"
-        f"💰  Баланс: <b>{fmt(nb)}$</b>\n\n"
-        f"📊  Мест: {new_claimed}/{slots}",
-        parse_mode="HTML"
-    )
-    
-    # Админу уведомление
-    try:
-        await bot.send_message(
-            ADMIN_ID,
-            f"🎫  <b>Активация чека</b>\n\n"
-            f"👤  {u['username']}\n"
-            f"💵  +{fmt(per_user)}$\n"
-            f"📊  {new_claimed}/{slots}",
-            parse_mode="HTML"
-        )
-    except: pass
 
 # ==================== MINES ====================
 @dp.callback_query(F.data == "mines")
@@ -429,6 +395,7 @@ async def cb_mines(cb: types.CallbackQuery):
         reply_markup=kb_mines_lvl(), parse_mode="HTML"
     )
     await cb.answer()
+
 
 @dp.callback_query(F.data.startswith("mines_l_"))
 async def cb_mines_l(cb: types.CallbackQuery):
@@ -444,6 +411,7 @@ async def cb_mines_l(cb: types.CallbackQuery):
     )
     await cb.answer()
 
+
 @dp.callback_query(F.data.startswith("mines_o_"))
 async def cb_mines_open(cb: types.CallbackQuery):
     uid = cb.from_user.id
@@ -453,7 +421,7 @@ async def cb_mines_open(cb: types.CallbackQuery):
     pos = int(cb.data.replace("mines_o_", ""))
     if pos in g["opened"]:
         await cb.answer("Уже открыто"); return
-    
+
     if pos in g["mines"]:
         u = db_get(uid)
         db_upd(uid, balance=g["bal_after"],
@@ -475,21 +443,20 @@ async def cb_mines_open(cb: types.CallbackQuery):
         rows.append([InlineKeyboardButton(text="🏠  В меню", callback_data="menu_games")])
         try:
             await cb.message.edit_text(
-                f"💥  <b>БУМ!</b>\n\n"
-                f"💣  Попал на мину!\n\n"
+                f"💥  <b>БУМ!</b>\n\n💣  Попал на мину!\n\n"
                 f"💸  Потеряно: <b>-{fmt(g['bet'])}$</b>\n"
                 f"💰  Баланс: <b>{fmt(g['bal_after'])}$</b>",
                 reply_markup=InlineKeyboardMarkup(inline_keyboard=rows), parse_mode="HTML"
             )
         except: pass
         await cb.answer("💥 Мина!", show_alert=True); return
-    
+
     g["opened"].append(pos)
     idx = len(g["opened"]) - 1
     mults = MINES_MULT[g["level"]]
     if idx < len(mults):
         g["mult"] = mults[idx]
-    
+
     safe_total = 9 - g["level"]
     if len(g["opened"]) >= safe_total:
         win_full = g["bet"] * g["mult"]
@@ -508,8 +475,7 @@ async def cb_mines_open(cb: types.CallbackQuery):
         rows.append([InlineKeyboardButton(text="🏠  В меню", callback_data="menu_games")])
         try:
             await cb.message.edit_text(
-                f"🎉  <b>ПОБЕДА!</b>\n\n"
-                f"Открыл все безопасные!\n\n"
+                f"🎉  <b>ПОБЕДА!</b>\n\nОткрыл все безопасные!\n\n"
                 f"🎯  x{g['mult']:.2f}\n"
                 f"➕  Выигрыш: <b>+{fmt(profit)}$</b>\n"
                 f"💰  Баланс: <b>{fmt(new_bal)}$</b>",
@@ -517,10 +483,11 @@ async def cb_mines_open(cb: types.CallbackQuery):
             )
         except: pass
         await cb.answer("🎉 Победа!"); return
-    
+
     try: await cb.message.edit_reply_markup(reply_markup=kb_mines_field(g))
     except: pass
     await cb.answer(f"💎 x{g['mult']:.2f}")
+
 
 @dp.callback_query(F.data == "mines_cash")
 async def cb_mines_cash(cb: types.CallbackQuery):
@@ -561,6 +528,7 @@ async def cb_mines_cash(cb: types.CallbackQuery):
     except: pass
     await cb.answer(f"💰 +{fmt(profit)}$")
 
+
 @dp.callback_query(F.data == "mines_cancel")
 async def cb_mines_cancel(cb: types.CallbackQuery):
     uid = cb.from_user.id
@@ -571,14 +539,14 @@ async def cb_mines_cancel(cb: types.CallbackQuery):
     await cb.message.edit_text("❌  Игра отменена.", reply_markup=kb_games())
     await cb.answer()
 
-# ==================== DICE ====================
+
+# ==================== DICE / BOWLING / DARTS ====================
 @dp.callback_query(F.data == "dice")
 async def cb_dice(cb: types.CallbackQuery):
-    await cb.message.edit_text(
-        "🎲  <b>КОСТИ</b>\n\nУгадай результат броска!",
-        reply_markup=kb_dice(), parse_mode="HTML"
-    )
+    await cb.message.edit_text("🎲  <b>КОСТИ</b>\n\nУгадай результат броска!",
+                                reply_markup=kb_dice(), parse_mode="HTML")
     await cb.answer()
+
 
 @dp.callback_query(F.data.startswith("dice_"))
 async def cb_dice_bet(cb: types.CallbackQuery):
@@ -586,30 +554,24 @@ async def cb_dice_bet(cb: types.CallbackQuery):
     bt = cb.data.replace("dice_", "")
     awaiting[uid] = {"game": "dice", "bet": bt}
     u = db_get(uid)
-    await cb.message.answer(
-        f"🎲  <b>Кости</b>\n\n💰  Баланс: <b>{fmt(u['balance'])}$</b>\n\n✏️ Введи сумму:",
-        parse_mode="HTML"
-    )
+    await cb.message.answer(f"🎲  <b>Кости</b>\n\n💰  Баланс: <b>{fmt(u['balance'])}$</b>\n\n✏️ Введи сумму:", parse_mode="HTML")
     await cb.answer()
 
-# ==================== BOWLING ====================
+
 @dp.callback_query(F.data == "bowling")
 async def cb_bowl(cb: types.CallbackQuery):
-    await cb.message.edit_text(
-        "🎳  <b>БОУЛИНГ</b>\n\nВыбери тип ставки:",
-        reply_markup=kb_bowl(), parse_mode="HTML"
-    )
+    await cb.message.edit_text("🎳  <b>БОУЛИНГ</b>\n\nВыбери тип ставки:",
+                                reply_markup=kb_bowl(), parse_mode="HTML")
     await cb.answer()
+
 
 @dp.callback_query(F.data.startswith("bowl_"))
 async def cb_bowl_bet(cb: types.CallbackQuery):
     uid = cb.from_user.id
     data = cb.data.replace("bowl_", "")
     if data == "portion":
-        await cb.message.edit_text(
-            "🎯  <b>Угадай часть сбитых</b> (x5)\n\nСколько кеглей?",
-            reply_markup=kb_bowl_portion(), parse_mode="HTML"
-        )
+        await cb.message.edit_text("🎯  <b>Угадай часть сбитых</b> (x5)\n\nСколько кеглей?",
+                                    reply_markup=kb_bowl_portion(), parse_mode="HTML")
         await cb.answer(); return
     if data.startswith("p_"):
         n = int(data.replace("p_", ""))
@@ -617,20 +579,16 @@ async def cb_bowl_bet(cb: types.CallbackQuery):
     else:
         awaiting[uid] = {"game": "bowl", "bet": data}
     u = db_get(uid)
-    await cb.message.answer(
-        f"🎳  <b>Боулинг</b>\n\n💰  Баланс: <b>{fmt(u['balance'])}$</b>\n\n✏️ Введи сумму:",
-        parse_mode="HTML"
-    )
+    await cb.message.answer(f"🎳  <b>Боулинг</b>\n\n💰  Баланс: <b>{fmt(u['balance'])}$</b>\n\n✏️ Введи сумму:", parse_mode="HTML")
     await cb.answer()
 
-# ==================== DARTS ====================
+
 @dp.callback_query(F.data == "darts")
 async def cb_darts(cb: types.CallbackQuery):
-    await cb.message.edit_text(
-        "🎯  <b>ДАРТС</b>\n\nВыбери куда попадёт дротик:",
-        reply_markup=kb_darts(), parse_mode="HTML"
-    )
+    await cb.message.edit_text("🎯  <b>ДАРТС</b>\n\nВыбери куда попадёт дротик:",
+                                reply_markup=kb_darts(), parse_mode="HTML")
     await cb.answer()
+
 
 @dp.callback_query(F.data.startswith("darts_"))
 async def cb_darts_bet(cb: types.CallbackQuery):
@@ -638,70 +596,51 @@ async def cb_darts_bet(cb: types.CallbackQuery):
     bt = cb.data.replace("darts_", "")
     awaiting[uid] = {"game": "darts", "bet": bt}
     u = db_get(uid)
-    await cb.message.answer(
-        f"🎯  <b>Дартс</b>\n\n💰  Баланс: <b>{fmt(u['balance'])}$</b>\n\n✏️ Введи сумму:",
-        parse_mode="HTML"
-    )
+    await cb.message.answer(f"🎯  <b>Дартс</b>\n\n💰  Баланс: <b>{fmt(u['balance'])}$</b>\n\n✏️ Введи сумму:", parse_mode="HTML")
     await cb.answer()
 
-# ==================== TEXT INPUT ====================
+
+# ==================== TEXT NUM ====================
 @dp.message(F.text.regexp(r"^\d+(\.\d+)?$"))
 async def msg_num(m: types.Message):
     uid = m.from_user.id
     name = uname(m.from_user)
     u = db_get(uid, name)
     val = float(m.text)
-    
+
     if uid in awaiting and awaiting[uid].get("dep_custom"):
         awaiting.pop(uid)
         if val < 1 or val > 10000: await m.answer("❌ 1-10000$"); return
         await do_deposit(m, uid, val); return
-    
+
     if uid in awaiting and awaiting[uid].get("withdraw"):
         awaiting.pop(uid)
         if val < WITHDRAW_MIN: await m.answer(f"❌ Мин: {WITHDRAW_MIN}$"); return
         if val > u["balance"]: await m.answer("❌ Недостаточно"); return
         await do_withdraw(m, uid, val); return
-    
-    if uid in awaiting and awaiting[uid].get("ad_check_total"):
-        awaiting[uid]["total"] = val
-        awaiting[uid]["step"] = "slots"
-        await m.answer("🔢 Сколько участников? (например 10):")
-        return
-    
-    if uid in awaiting and awaiting[uid].get("ad_check_slots"):
-        awaiting[uid]["slots"] = int(val)
-        awaiting[uid]["step"] = "create"
-        await m.answer("✏️ Введи короткое название/комментарий чека (до 20 символов):")
-        return
-    
-    if uid in awaiting and awaiting[uid].get("ad_bonus_uid"):
-        pass  # handled by separate flow
-    
+
     if uid not in awaiting or "game" not in awaiting[uid]:
         return
-    
+
     t = awaiting[uid]
     g = t["game"]
     if val < BET_MIN: await m.answer(f"❌ Мин: {BET_MIN}$"); return
     if val > BET_MAX: await m.answer(f"❌ Макс: {BET_MAX}$"); return
     if val > u["balance"]: await m.answer(f"❌ Недостаточно. Баланс: {fmt(u['balance'])}$"); return
-    
+
     new_bal = round(u["balance"] - val, 2)
     db_upd(uid, balance=new_bal)
-    
+
     if g == "mines":
         lvl = t["level"]
         mines = random.sample(range(9), lvl)
         mines_state[uid] = {"bet": val, "level": lvl, "mines": mines,
                             "opened": [], "mult": 0, "bal_after": new_bal}
         awaiting.pop(uid)
-        await m.answer(
-            f"💣  <b>Мина — {lvl} мин</b>\n\n💵  Ставка: <b>{fmt(val)}$</b>\n\nОткрывай клетки! 💎",
-            reply_markup=kb_mines_field(mines_state[uid]), parse_mode="HTML"
-        )
+        await m.answer(f"💣  <b>Мина — {lvl} мин</b>\n\n💵  Ставка: <b>{fmt(val)}$</b>\n\nОткрывай клетки! 💎",
+                       reply_markup=kb_mines_field(mines_state[uid]), parse_mode="HTML")
         return
-    
+
     if g == "dice":
         bt = t["bet"]
         awaiting.pop(uid)
@@ -715,7 +654,7 @@ async def msg_num(m: types.Message):
         elif bt == "odd" and r in [1,3,5]: win = True
         await end_game(m, uid, val, win, 2, f"🎲 Выпало {r}", "dice")
         return
-    
+
     if g == "bowl":
         bt = t["bet"]
         awaiting.pop(uid)
@@ -735,7 +674,7 @@ async def msg_num(m: types.Message):
             txt = f"🎳 {r}/6 → " + (f"Угадал {n}/6 ✅" if win else f"Не угадал ❌")
         await end_game(m, uid, val, win, mult, txt, "bowling")
         return
-    
+
     if g == "darts":
         bt = t["bet"]
         awaiting.pop(uid)
@@ -757,6 +696,7 @@ async def msg_num(m: types.Message):
             txt = f"🎯 {r} → " + ("↩️ Отскок ✅" if win else "Не отскок ❌")
         await end_game(m, uid, val, win, mult, txt, "darts")
         return
+
 
 async def end_game(msg, uid, bet, win, mult, text_res, game_code):
     u = db_get(uid)
@@ -780,19 +720,13 @@ async def end_game(msg, uid, bet, win, mult, text_res, game_code):
     ])
     await msg.answer(text, reply_markup=kb, parse_mode="HTML")
 
-# ==================== TEXT (checks) ====================
-@dp.message(F.text.regexp(r"^MC-[A-Z0-9]+$"))
-async def msg_claim(m: types.Message):
-    uid = m.from_user.id
-    if uid in awaiting and awaiting[uid].get("claim_check"):
-        awaiting.pop(uid)
-        await do_claim_check(m, uid, m.text)
 
 # ==================== DEPOSIT ====================
 @dp.callback_query(F.data == "deposit")
 async def cb_dep(cb: types.CallbackQuery):
     await cb.message.edit_text("💳  <b>Пополнение</b>\n\nВыбери сумму:", reply_markup=kb_dep(), parse_mode="HTML")
     await cb.answer()
+
 
 @dp.callback_query(F.data.startswith("dep_"))
 async def cb_dep_amt(cb: types.CallbackQuery):
@@ -804,6 +738,7 @@ async def cb_dep_amt(cb: types.CallbackQuery):
         await cb.answer(); return
     await do_deposit(cb.message, uid, float(d))
     await cb.answer()
+
 
 async def do_deposit(msg, uid, amount):
     if not crypto:
@@ -818,6 +753,7 @@ async def do_deposit(msg, uid, amount):
         await msg.answer(f"💳  <b>Счёт на {amount}$</b>\n\nОплати по кнопке 👇", reply_markup=kb, parse_mode="HTML")
     except Exception as e:
         await msg.answer(f"❌ {e}")
+
 
 @dp.callback_query(F.data.startswith("chk_"))
 async def cb_chk(cb: types.CallbackQuery):
@@ -844,6 +780,7 @@ async def cb_chk(cb: types.CallbackQuery):
         await cb.message.answer(f"❌ {e}")
     await cb.answer()
 
+
 # ==================== WITHDRAW ====================
 @dp.callback_query(F.data == "withdraw")
 async def cb_wd(cb: types.CallbackQuery):
@@ -852,11 +789,9 @@ async def cb_wd(cb: types.CallbackQuery):
     if u["balance"] < WITHDRAW_MIN:
         await cb.answer(f"Мин: {WITHDRAW_MIN}$", show_alert=True); return
     awaiting[uid] = {"withdraw": True}
-    await cb.message.answer(
-        f"📤  <b>Вывод</b>\n\n💰  Баланс: <b>{fmt(u['balance'])}$</b>\n\n✏️ Введи сумму:",
-        parse_mode="HTML"
-    )
+    await cb.message.answer(f"📤  <b>Вывод</b>\n\n💰  Баланс: <b>{fmt(u['balance'])}$</b>\n\n✏️ Введи сумму:", parse_mode="HTML")
     await cb.answer()
+
 
 async def do_withdraw(msg, uid, amount):
     u = db_get(uid)
@@ -867,6 +802,7 @@ async def do_withdraw(msg, uid, amount):
         await msg.answer(f"✅  <b>Чек на {amount}$</b>\n\nАктивируй 👇", reply_markup=kb, parse_mode="HTML")
     except Exception as e:
         await msg.answer("❌  <b>Вывод временно не работает</b>\n\nПопробуйте позже.", parse_mode="HTML")
+
 
 # ==================== TOP ====================
 @dp.callback_query(F.data.startswith("top_"))
@@ -902,6 +838,7 @@ async def cb_top_show(cb: types.CallbackQuery):
     await cb.message.edit_text(text, reply_markup=kb_top(), parse_mode="HTML")
     await cb.answer()
 
+
 # ==================== ADMIN ====================
 @dp.callback_query(F.data == "ad_stats")
 async def cb_ad_stats(cb: types.CallbackQuery):
@@ -923,6 +860,7 @@ async def cb_ad_stats(cb: types.CallbackQuery):
     )
     await cb.answer()
 
+
 @dp.callback_query(F.data == "ad_users")
 async def cb_ad_users(cb: types.CallbackQuery):
     if cb.from_user.id != ADMIN_ID: return
@@ -937,72 +875,247 @@ async def cb_ad_users(cb: types.CallbackQuery):
     await cb.message.edit_text(text, reply_markup=kb_admin(), parse_mode="HTML")
     await cb.answer()
 
-# ============ ADMIN: MULTICHECK ============
+
 @dp.callback_query(F.data == "ad_multicheck")
 async def cb_ad_multicheck(cb: types.CallbackQuery):
     if cb.from_user.id != ADMIN_ID: return
-    uid = cb.from_user.id
-    awaiting[uid] = {"ad_check_total": True}
     await cb.message.answer(
         "🎫  <b>Создание МультиЧека</b>\n\n"
-        "Пример: 100$ на 10 участников\n"
-        "Каждый получит по 10$\n\n"
-        "✏️ Введи <b>общую сумму</b> чека ($):",
+        "<b>Команда:</b>\n"
+        "<code>/multicheck 100 10 5</code>\n\n"
+        "•  💰 100 — общая сумма ($)\n"
+        "•  👥 10 — активаций\n"
+        "•  📊 5 — мин. оборот ($)\n\n"
+        "Бот опубликует чек в канал",
         parse_mode="HTML"
     )
     await cb.answer()
 
-# ============ ADMIN: BONUS CHECK ============
+
 @dp.callback_query(F.data == "ad_bonuscheck")
 async def cb_ad_bonuscheck(cb: types.CallbackQuery):
     if cb.from_user.id != ADMIN_ID: return
     await cb.message.answer(
         "🎁  <b>Бонус Чек</b>\n\n"
-        "Начислить игроку игровой баланс\n\n"
-        "<b>Способ 1:</b> Ответом на сообщение игрока\n"
-        "<code>/bonuscheck 50</code>\n\n"
-        "<b>Способ 2:</b> По @username\n"
+        "Начислить игроку баланс\n\n"
+        "<b>Команды:</b>\n"
+        "<code>/bonuscheck 50</code> (ответом)\n"
         "<code>/bonuscheck @user 50</code>",
         parse_mode="HTML"
     )
     await cb.answer()
+
 
 @dp.callback_query(F.data == "ad_checks")
 async def cb_ad_checks(cb: types.CallbackQuery):
     if cb.from_user.id != ADMIN_ID: return
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    c.execute("SELECT code, total, slots, per_user, claimed, active FROM multichecks ORDER BY created DESC LIMIT 20")
+    c.execute("SELECT code, total, slots, per_user, min_turnover, claimed, active FROM multichecks ORDER BY created DESC LIMIT 20")
     rows = c.fetchall()
     conn.close()
     if not rows:
         text = "📋  <b>Активные чеки</b>\n\nПока нет чеков"
     else:
         text = "📋  <b>Список чеков</b>\n\n"
-        for code, total, slots, per_user, claimed, active in rows:
+        for code, total, slots, per_user, min_turnover, claimed, active in rows:
             status = "🟢" if active else "🔴"
             text += f"{status}  <code>{code}</code>\n"
             text += f"   💰 {fmt(total)}$ ÷ {slots} = {fmt(per_user)}$\n"
-            text += f"   📊 {claimed}/{slots}\n\n"
+            text += f"   📊 Мин: {fmt(min_turnover)}$\n"
+            text += f"   🎫 {claimed}/{slots}\n\n"
     await cb.message.edit_text(text, reply_markup=kb_admin(), parse_mode="HTML")
     await cb.answer()
+
 
 @dp.callback_query(F.data == "ad_help")
 async def cb_ad_help(cb: types.CallbackQuery):
     if cb.from_user.id != ADMIN_ID: return
     await cb.message.answer(
         "💬  <b>Помощь</b>\n\n"
-        "🎫  <b>МультиЧек</b> — кнопка «Создать МультиЧек»\n"
-        "100$ на 10 человек = каждому 10$\n\n"
-        "🎁  <b>Бонус Чек</b> — команда:\n"
-        "<code>/bonuscheck 50</code> (ответом)\n"
+        "🎫  <b>МультиЧек:</b>\n"
+        "<code>/multicheck 100 10 5</code>\n\n"
+        "🎁  <b>Бонус Чек:</b>\n"
+        "<code>/bonuscheck 50</code>\n"
         "<code>/bonuscheck @user 50</code>\n\n"
         "📋  <b>Активные чеки</b> — список",
         parse_mode="HTML"
     )
     await cb.answer()
 
-# ============ ADMIN COMMANDS ============
+
+# ==================== /multicheck ====================
+@dp.message(Command("multicheck"))
+async def cmd_multicheck(m: types.Message):
+    if m.from_user.id != ADMIN_ID:
+        await m.answer("❌ Нет прав"); return
+
+    args = m.text.split()
+    if len(args) < 4:
+        await m.answer(
+            "📋  <b>Формат:</b>\n"
+            "<code>/multicheck 100 10 5</code>\n\n"
+            "• 100 — общая сумма ($)\n"
+            "• 10 — активаций\n"
+            "• 5 — мин. оборот ($)",
+            parse_mode="HTML"
+        )
+        return
+
+    try:
+        total = float(args[1])
+        slots = int(args[2])
+        min_turnover = float(args[3])
+    except:
+        await m.answer("❌  Неверный формат"); return
+
+    if total <= 0 or slots <= 0:
+        await m.answer("❌  Сумма и кол-во > 0"); return
+    if slots > 100:
+        await m.answer("❌  Максимум 100"); return
+
+    per_user = round(total / slots, 2)
+    code = f"MC-{''.join(random.choices('ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', k=8))}"
+
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("""INSERT INTO multichecks
+        (code, total, slots, per_user, min_turnover, claimed, activated_by, creator, active, created)
+        VALUES (?,?,?,?,?,?,?,?,?,?)""",
+        (code, total, slots, per_user, min_turnover, 0, "", m.from_user.id, 1,
+         datetime.now().strftime("%Y-%m-%d %H:%M")))
+    conn.commit()
+    conn.close()
+
+    if CHANNEL_ID:
+        try:
+            kb = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="🎫  Активировать чек", callback_data=f"mc_claim_{code}")]
+            ])
+            await bot.send_message(
+                CHANNEL_ID,
+                f"🎫  <b>МУЛЬТИЧЕК</b>\n\n"
+                f"💰  Сумма: <b>{fmt(total)}$</b>\n"
+                f"👥  Активаций: <b>{slots}</b>\n"
+                f"💵  Каждому: <b>{fmt(per_user)}$</b>\n"
+                f"📊  Мин. оборот: <b>{fmt(min_turnover)}$</b>\n\n"
+                f"👇  Нажми кнопку ниже:",
+                reply_markup=kb, parse_mode="HTML"
+            )
+            await m.answer(
+                f"✅  <b>МультиЧек создан!</b>\n\n"
+                f"🎫  Код: <code>{code}</code>\n"
+                f"💰  {fmt(total)}$ ÷ {slots} = <b>{fmt(per_user)}$</b>\n"
+                f"📊  Мин. оборот: <b>{fmt(min_turnover)}$</b>\n\n"
+                f"📤  Опубликован в канале",
+                parse_mode="HTML"
+            )
+        except Exception as e:
+            await m.answer(f"❌  Ошибка публикации: <code>{e}</code>", parse_mode="HTML")
+    else:
+        await m.answer(f"⚠️  CHANNEL_ID не настроен\n\n🎫  Код: <code>{code}</code>", parse_mode="HTML")
+
+
+# ==================== CLAIM ====================
+@dp.callback_query(F.data.startswith("mc_claim_"))
+async def cb_mc_claim(cb: types.CallbackQuery):
+    code = cb.data.replace("mc_claim_", "")
+    uid = cb.from_user.id
+    username = uname(cb.from_user)
+    u = db_get(uid, username)
+
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("SELECT total, slots, per_user, min_turnover, claimed, activated_by, active FROM multichecks WHERE code=?", (code,))
+    row = c.fetchone()
+    conn.close()
+
+    if not row:
+        await cb.answer("❌ Чек не найден", show_alert=True); return
+
+    total, slots, per_user, min_turnover, claimed, activated_by, active = row
+
+    if not active:
+        await cb.answer("❌ Чек завершён (все слоты заняты)", show_alert=True); return
+
+    activated_list = activated_by.split(",") if activated_by else []
+    if str(uid) in activated_list:
+        await cb.answer("⚠️ Вы уже активировали этот чек!", show_alert=True); return
+
+    if claimed >= slots:
+        await cb.answer("❌ Все слоты заняты!", show_alert=True); return
+
+    # Тексеру: оборот
+    if u["total_bets"] < min_turnover:
+        await cb.answer(
+            f"❌ Недостаточный оборот!\n\n"
+            f"Требуется: {fmt(min_turnover)}$\n"
+            f"У вас: {fmt(u['total_bets'])}$\n\n"
+            f"🎮 Играйте, чтобы увеличить оборот",
+            show_alert=True
+        )
+        return
+
+    # ✅ Активация
+    new_claimed = claimed + 1
+    activated_list.append(str(uid))
+    new_activated = ",".join(activated_list)
+    new_active = 1 if new_claimed < slots else 0
+
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("UPDATE multichecks SET claimed=?, activated_by=?, active=? WHERE code=?",
+              (new_claimed, new_activated, new_active, code))
+    conn.commit()
+    conn.close()
+
+    nb = round(u["balance"] + per_user, 2)
+    db_upd(uid, balance=nb)
+
+    await cb.answer(
+        f"✅ Чек активирован!\n\n"
+        f"💵 +{fmt(per_user)}$\n"
+        f"💰 Баланс: {fmt(nb)}$\n"
+        f"📊 {new_claimed}/{slots}",
+        show_alert=True
+    )
+
+    try:
+        await bot.send_message(
+            uid,
+            f"🎉  <b>Чек активирован!</b>\n\n"
+            f"🎫  <code>{code}</code>\n"
+            f"💵  Получено: <b>+{fmt(per_user)}$</b>\n"
+            f"💰  Баланс: <b>{fmt(nb)}$</b>\n"
+            f"📊  Активаций: <b>{new_claimed}/{slots}</b>",
+            parse_mode="HTML"
+        )
+    except: pass
+
+    if CHANNEL_ID and new_claimed >= slots:
+        try:
+            await bot.send_message(
+                CHANNEL_ID,
+                f"✅  <b>МультиЧек {code} завершён!</b>\n\n"
+                f"Все {slots} активаций использованы",
+                parse_mode="HTML"
+            )
+        except: pass
+
+    try:
+        await bot.send_message(
+            ADMIN_ID,
+            f"🎫  <b>Активация чека</b>\n\n"
+            f"👤  {username}\n"
+            f"📊  Оборот: {fmt(u['total_bets'])}$\n"
+            f"💵  +{fmt(per_user)}$\n"
+            f"📈  {new_claimed}/{slots}",
+            parse_mode="HTML"
+        )
+    except: pass
+
+
+# ==================== /bonuscheck ====================
 @dp.message(Command("bonuscheck"))
 async def cmd_bonuscheck(m: types.Message):
     if m.from_user.id != ADMIN_ID: return
@@ -1030,78 +1143,68 @@ async def cmd_bonuscheck(m: types.Message):
         f"✅  <b>Бонус Чек выдан</b>\n\n"
         f"👤  {u['username']}\n"
         f"➕  +{amt}$\n"
-        f"💰  Баланс: {fmt(nb)}$",
+        f"💰  {fmt(nb)}$",
         parse_mode="HTML"
     )
     try:
         await bot.send_message(tid,
-            f"🎁  <b>Вам выдан Бонус Чек!</b>\n\n➕  +{amt}$\n💰  Баланс: {fmt(nb)}$",
+            f"🎁  <b>Вам выдан Бонус Чек!</b>\n\n➕  +{amt}$\n💰  {fmt(nb)}$",
             parse_mode="HTML")
     except: pass
 
-# ============ SAVE MULTICHECK ============
-@dp.message(F.text.len() <= 20)
-async def msg_check_name(m: types.Message):
-    uid = m.from_user.id
-    if uid not in awaiting or not awaiting[uid].get("ad_check_slots"):
-        return
-    total = awaiting[uid]["total"]
-    slots = awaiting[uid]["slots"]
-    per_user = round(total / slots, 2)
-    
-    # Генерация кода
-    code = f"MC-{''.join(random.choices('ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', k=6))}"
-    
+
+# ==================== /dbinfo ====================
+@dp.message(Command("dbinfo"))
+async def cmd_dbinfo(m: types.Message):
+    if m.from_user.id != ADMIN_ID: return
+    file_exists = os.path.exists(DB_PATH)
+    file_size = os.path.getsize(DB_PATH) if file_exists else 0
+
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    c.execute("INSERT INTO multichecks(code, total, slots, per_user, claimed, activated_by, creator, active, created) VALUES(?,?,?,?,?,?,?,?,?)",
-              (code, total, slots, per_user, 0, "", uid, 1, datetime.now().strftime("%Y-%m-%d %H:%M")))
-    conn.commit()
+    c.execute("SELECT COUNT(*) FROM users")
+    uc = c.fetchone()[0]
+    c.execute("SELECT COUNT(*) FROM multichecks")
+    mc = c.fetchone()[0]
+    c.execute("SELECT SUM(balance), SUM(total_bets) FROM users")
+    r = c.fetchone()
     conn.close()
-    
-    awaiting.pop(uid)
-    
-    text = (
-        f"✅  <b>МультиЧек создан!</b>\n\n"
-        f"🎫  Код: <code>{code}</code>\n"
-        f"💰  Сумма: <b>{fmt(total)}$</b>\n"
-        f"👥  Участников: <b>{slots}</b>\n"
-        f"💵  Каждому: <b>{fmt(per_user)}$</b>\n\n"
-        f"📤  Отправь код игрокам:\n"
-        f"<code>{code}</code>\n\n"
-        f"Игрок: Баланс → Активировать чек"
+
+    await m.answer(
+        f"📁  <b>Информация о БД</b>\n\n"
+        f"📂  Путь: <code>{DB_PATH}</code>\n"
+        f"✅  Файл: {'есть' if file_exists else 'НЕТ'}\n"
+        f"📦  Размер: <b>{file_size}</b> байт\n\n"
+        f"👥  Игроков: <b>{uc}</b>\n"
+        f"🎫  Чеков: <b>{mc}</b>\n"
+        f"💰  Баланс: <b>{fmt(r[0] or 0)}$</b>\n"
+        f"💵  Оборот: <b>{fmt(r[1] or 0)}$</b>",
+        parse_mode="HTML"
     )
-    await m.answer(text, parse_mode="HTML")
-    
-    # Каналға жариялау
-    if CHANNEL_ID:
-        try:
-            await bot.send_message(CHANNEL_ID,
-                f"🎫  <b>МУЛЬТИЧЕК!</b>\n\n"
-                f"💰  Сумма: <b>{fmt(total)}$</b>\n"
-                f"👥  Участников: <b>{slots}</b>\n"
-                f"💵  Каждому: <b>{fmt(per_user)}$</b>\n\n"
-                f"Активировать: бот → Баланс → Активировать чек",
-                parse_mode="HTML")
-        except: pass
+
 
 # ==================== NOOP ====================
 @dp.callback_query(F.data == "noop")
 async def cb_noop(cb: types.CallbackQuery):
     await cb.answer()
 
+
 # ==================== MAIN ====================
 async def main():
     db_init()
     print("=" * 40)
-    print("🎰  BET GAMES запущен!")
+    print("🎰  STAVKA BOT запущен!")
     me = await bot.get_me()
     print(f"Бот: @{me.username}")
+    print(f"📁 DB: {DB_PATH}")
     print("=" * 40)
     await dp.start_polling(bot)
+
 
 if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
         print("\n⏹ Остановлен")
+    except Exception as e:
+        print(f"\n❌ КАТЕ: {e}")
