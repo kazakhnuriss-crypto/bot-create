@@ -28,7 +28,7 @@ REF_PERCENT = 0.10
 HOUSE_EDGE = 0.05
 TON_USD = 5.0
 STAR_USD = 0.013
-BIG_BET = 10  # 10$+ ставка каналга
+BIG_BET = 10
 
 logging.basicConfig(level=logging.INFO)
 bot = Bot(token=BOT_TOKEN)
@@ -115,23 +115,23 @@ def reply_kb(uid):
 
 def kb_games():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🎲  𝙆𝙤𝙨𝙩𝙞", callback_data="dice"),
-         InlineKeyboardButton(text="🎯  𝘿𝙖𝙧𝙩𝙨", callback_data="darts")],
-        [InlineKeyboardButton(text="⚽  𝙁𝙪𝙩𝙗𝙤𝙡", callback_data="football"),
-         InlineKeyboardButton(text="🏀  𝘽𝙖𝙨𝙠𝙚𝙩𝙗𝙤𝙡", callback_data="basketball")],
-        [InlineKeyboardButton(text="🎳  𝘽𝙤𝙪𝙡𝙞𝙣𝙜", callback_data="bowling"),
-         InlineKeyboardButton(text="🎰  𝟳𝟳𝟳", callback_data="slot")],
+        [InlineKeyboardButton(text="🎲  Кости", callback_data="dice"),
+         InlineKeyboardButton(text="🎯  Дартс", callback_data="darts")],
+        [InlineKeyboardButton(text="⚽  Футбол", callback_data="football"),
+         InlineKeyboardButton(text="🏀  Баскетбол", callback_data="basketball")],
+        [InlineKeyboardButton(text="🎳  Боулинг", callback_data="bowling"),
+         InlineKeyboardButton(text="🎰  777", callback_data="slot")],
     ])
 
 
 def kb_dice():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="⬆️  𝘽𝙤𝙡𝙮𝙨𝙝𝙚", callback_data="dice_more")],
-        [InlineKeyboardButton(text="⬇️  𝙈𝙚𝙣𝙮𝙨𝙝𝙚", callback_data="dice_less")],
-        [InlineKeyboardButton(text="➗  𝘾𝙝𝙚𝙩𝙣𝙤𝙚", callback_data="dice_even")],
-        [InlineKeyboardButton(text="➖  𝙉𝙚𝙘𝙝𝙚𝙩𝙣𝙤𝙚", callback_data="dice_odd")],
-        [InlineKeyboardButton(text="🎯  𝙐𝙜𝙖𝙙𝙖𝙩𝙮 𝙘𝙝𝙞𝙨𝙡𝙤", callback_data="dice_exact")],
-        [InlineKeyboardButton(text="⬅️  𝙉𝙖𝙯𝙖𝙙", callback_data="menu_games")],
+        [InlineKeyboardButton(text="⬆️  Больше", callback_data="dice_more")],
+        [InlineKeyboardButton(text="⬇️  Меньше", callback_data="dice_less")],
+        [InlineKeyboardButton(text="🔢  Чётное", callback_data="dice_even")],
+        [InlineKeyboardButton(text="🔣  Нечётное", callback_data="dice_odd")],
+        [InlineKeyboardButton(text="🎯  Угадать число", callback_data="dice_exact")],
+        [InlineKeyboardButton(text="◀️  Назад", callback_data="menu_games")],
     ])
 
 
@@ -143,105 +143,105 @@ def kb_dice_num():
         [InlineKeyboardButton(text="4️⃣", callback_data="dice_n_4"),
          InlineKeyboardButton(text="5️⃣", callback_data="dice_n_5"),
          InlineKeyboardButton(text="6️⃣", callback_data="dice_n_6")],
-        [InlineKeyboardButton(text="⬅️  𝙉𝙖𝙯𝙖𝙙", callback_data="dice")],
+        [InlineKeyboardButton(text="◀️  Назад", callback_data="dice")],
     ])
 
 
 def kb_darts():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🔴  𝙆𝙧𝙖𝙨𝙣𝙮𝙮 𝙨𝙚𝙠𝙩𝙤𝙧", callback_data="darts_red")],
-        [InlineKeyboardButton(text="⚪  𝘽𝙚𝙡𝙮𝙮 𝙨𝙚𝙠𝙩𝙤𝙧", callback_data="darts_white")],
-        [InlineKeyboardButton(text="🎯  𝘾𝙚𝙣𝙩𝙧", callback_data="darts_center")],
-        [InlineKeyboardButton(text="↩️  𝙊𝙩𝙨𝙠𝙤𝙠", callback_data="darts_bounce")],
-        [InlineKeyboardButton(text="✨  𝙎𝙚𝙠𝙩𝙤𝙧 𝘿𝙪𝙗𝙡", callback_data="darts_double")],
-        [InlineKeyboardButton(text="⬅️  𝙉𝙖𝙯𝙖𝙙", callback_data="menu_games")],
+        [InlineKeyboardButton(text="🔴  Красный сектор", callback_data="darts_red")],
+        [InlineKeyboardButton(text="⚪  Белый сектор", callback_data="darts_white")],
+        [InlineKeyboardButton(text="🎯  Центр", callback_data="darts_center")],
+        [InlineKeyboardButton(text="↩️  Отскок", callback_data="darts_bounce")],
+        [InlineKeyboardButton(text="✨  Сектор Дубль", callback_data="darts_double")],
+        [InlineKeyboardButton(text="◀️  Назад", callback_data="menu_games")],
     ])
 
 
 def kb_football():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="⚽  𝘾𝙝𝙞𝙨𝙩𝙮𝙮 𝙜𝙤𝙡", callback_data="fb_goal")],
-        [InlineKeyboardButton(text="❌  𝙋𝙧𝙤𝙢𝙖𝙠𝙝", callback_data="fb_miss")],
-        [InlineKeyboardButton(text="🥅  𝙐𝙙𝙖𝙧 𝙤𝙗 𝙨𝙝𝙩𝙖𝙣𝙜𝙪", callback_data="fb_post")],
-        [InlineKeyboardButton(text="✨  𝙂𝙤𝙡 𝙨𝙤 𝙨𝙝𝙩𝙖𝙣𝙜", callback_data="fb_postgoal")],
-        [InlineKeyboardButton(text="⬅️  𝙉𝙖𝙯𝙖𝙙", callback_data="menu_games")],
+        [InlineKeyboardButton(text="⚽  Чистый гол", callback_data="fb_goal")],
+        [InlineKeyboardButton(text="❌  Промах", callback_data="fb_miss")],
+        [InlineKeyboardButton(text="🥅  Удар об штангу", callback_data="fb_post")],
+        [InlineKeyboardButton(text="✨  Гол со штанг", callback_data="fb_postgoal")],
+        [InlineKeyboardButton(text="◀️  Назад", callback_data="menu_games")],
     ])
 
 
 def kb_basketball():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🏀  𝘾𝙝𝙞𝙨𝙩𝙮𝙮 𝙜𝙤𝙡", callback_data="bb_goal")],
-        [InlineKeyboardButton(text="❌  𝙋𝙧𝙤𝙢𝙖𝙠𝙝", callback_data="bb_miss")],
-        [InlineKeyboardButton(text="🌀  𝙋𝙧𝙤𝙠𝙧𝙪𝙩", callback_data="bb_spin")],
-        [InlineKeyboardButton(text="⬅️  𝙉𝙖𝙯𝙖𝙙", callback_data="menu_games")],
+        [InlineKeyboardButton(text="🏀  Чистый гол", callback_data="bb_goal")],
+        [InlineKeyboardButton(text="❌  Промах", callback_data="bb_miss")],
+        [InlineKeyboardButton(text="🌀  Прокрут", callback_data="bb_spin")],
+        [InlineKeyboardButton(text="◀️  Назад", callback_data="menu_games")],
     ])
 
 
 def kb_bowling():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="❌  𝙋𝙧𝙤𝙢𝙖𝙠𝙝", callback_data="bl_miss")],
-        [InlineKeyboardButton(text="🎳  𝙎𝙩𝙧𝙖𝙮𝙠", callback_data="bl_strike")],
-        [InlineKeyboardButton(text="🎯  𝙐𝙜𝙖𝙙𝙖𝙩𝙮 𝙨𝙗𝙞𝙩𝙤", callback_data="bl_exact")],
-        [InlineKeyboardButton(text="⬅️  𝙉𝙖𝙯𝙖𝙙", callback_data="menu_games")],
+        [InlineKeyboardButton(text="❌  Промах", callback_data="bl_miss")],
+        [InlineKeyboardButton(text="🎳  Страйк", callback_data="bl_strike")],
+        [InlineKeyboardButton(text="🎯  Угадать сбито", callback_data="bl_exact")],
+        [InlineKeyboardButton(text="◀️  Назад", callback_data="menu_games")],
     ])
 
 
 def kb_bowling_num():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="1", callback_data="bl_n_1"),
-         InlineKeyboardButton(text="2", callback_data="bl_n_2"),
-         InlineKeyboardButton(text="3", callback_data="bl_n_3")],
-        [InlineKeyboardButton(text="4", callback_data="bl_n_4"),
-         InlineKeyboardButton(text="5", callback_data="bl_n_5"),
-         InlineKeyboardButton(text="6", callback_data="bl_n_6")],
-        [InlineKeyboardButton(text="⬅️  𝙉𝙖𝙯𝙖𝙙", callback_data="bowling")],
+        [InlineKeyboardButton(text="1️⃣", callback_data="bl_n_1"),
+         InlineKeyboardButton(text="2️⃣", callback_data="bl_n_2"),
+         InlineKeyboardButton(text="3️⃣", callback_data="bl_n_3")],
+        [InlineKeyboardButton(text="4️⃣", callback_data="bl_n_4"),
+         InlineKeyboardButton(text="5️⃣", callback_data="bl_n_5"),
+         InlineKeyboardButton(text="6️⃣", callback_data="bl_n_6")],
+        [InlineKeyboardButton(text="◀️  Назад", callback_data="bowling")],
     ])
 
 
 def kb_slot():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🎰  𝟳𝟳𝟳 𝘿𝙯𝙝𝙚𝙠𝙥𝙤𝙩", callback_data="slot_777")],
-        [InlineKeyboardButton(text="⬅️  𝙉𝙖𝙯𝙖𝙙", callback_data="menu_games")],
+        [InlineKeyboardButton(text="🎰  777 Джекпот", callback_data="slot_777")],
+        [InlineKeyboardButton(text="◀️  Назад", callback_data="menu_games")],
     ])
 
 
 def kb_top():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="💰  𝙋𝙤 𝙗𝙖𝙡𝙖𝙣𝙨𝙪", callback_data="top_bal"),
-         InlineKeyboardButton(text="🎮  𝙋𝙤 𝙞𝙜𝙧𝙖𝙢", callback_data="top_g")],
-        [InlineKeyboardButton(text="👥  𝙋𝙤 𝙧𝙚𝙛𝙚𝙧𝙖𝙡𝙖𝙢", callback_data="top_r")],
+        [InlineKeyboardButton(text="💰  По балансу", callback_data="top_bal"),
+         InlineKeyboardButton(text="🎮  По играм", callback_data="top_g")],
+        [InlineKeyboardButton(text="👥  По рефералам", callback_data="top_r")],
     ])
 
 
 def kb_balance():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="💳  𝙋𝙤𝙥𝙤𝙡𝙣𝙞𝙩𝙮", callback_data="deposit_menu"),
-         InlineKeyboardButton(text="📤  𝙑𝙮𝙫𝙚𝙨𝙩𝙞", callback_data="withdraw")],
+        [InlineKeyboardButton(text="💳  Пополнить", callback_data="deposit_menu"),
+         InlineKeyboardButton(text="📤  Вывести", callback_data="withdraw")],
     ])
 
 
 def kb_profile():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="👥  𝙍𝙚𝙛𝙚𝙧𝙖𝙡𝙠𝙖", callback_data="ref_link")],
-        [InlineKeyboardButton(text="📊  𝙈𝙤𝙮𝙖 𝙨𝙩𝙖𝙩𝙞𝙨𝙩𝙞𝙠𝙖", callback_data="my_stats")],
+        [InlineKeyboardButton(text="👥  Рефералка", callback_data="ref_link")],
+        [InlineKeyboardButton(text="📊  Моя статистика", callback_data="my_stats")],
     ])
 
 
 def kb_admin():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="📊  𝙎𝙩𝙖𝙩𝙞𝙨𝙩𝙞𝙠𝙖", callback_data="ad_stats"),
-         InlineKeyboardButton(text="👥  𝙄𝙜𝙧𝙤𝙠𝙞", callback_data="ad_users")],
-        [InlineKeyboardButton(text="🎫  𝙈𝙪𝙡𝙩𝙞𝘾𝙝𝙚𝙠", callback_data="ad_multicheck")],
-        [InlineKeyboardButton(text="📋  𝘼𝙠𝙩𝙞𝙫𝙣𝙮𝙚 𝙘𝙝𝙚𝙠𝙞", callback_data="ad_checks")],
+        [InlineKeyboardButton(text="📊  Статистика", callback_data="ad_stats"),
+         InlineKeyboardButton(text="👥  Игроки", callback_data="ad_users")],
+        [InlineKeyboardButton(text="🎫  МультиЧек", callback_data="ad_multicheck")],
+        [InlineKeyboardButton(text="📋  Активные чеки", callback_data="ad_checks")],
     ])
 
 
 def kb_deposit_menu():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="💎  𝘾𝙧𝙮𝙥𝙩𝙤𝘽𝙤𝙩 (USDT)", callback_data="dep_crypto")],
-        [InlineKeyboardButton(text="💠  𝙏𝙤𝙣𝙆𝙚𝙚𝙥𝙚𝙧 (TON)", callback_data="dep_ton")],
-        [InlineKeyboardButton(text="⭐  𝙏𝙚𝙡𝙚𝙜𝙧𝙖𝙢 𝙎𝙩𝙖𝙧𝙨", callback_data="dep_stars")],
-        [InlineKeyboardButton(text="⬅️  𝙉𝙖𝙯𝙖𝙙", callback_data="menu_balance")],
+        [InlineKeyboardButton(text="💎  CryptoBot (USDT)", callback_data="dep_crypto")],
+        [InlineKeyboardButton(text="💠  TonKeeper (TON)", callback_data="dep_ton")],
+        [InlineKeyboardButton(text="⭐  Telegram Stars", callback_data="dep_stars")],
+        [InlineKeyboardButton(text="◀️  Назад", callback_data="menu_balance")],
     ])
 
 
@@ -253,8 +253,8 @@ def kb_crypto_amounts():
         [InlineKeyboardButton(text="25$", callback_data="cp_25"),
          InlineKeyboardButton(text="50$", callback_data="cp_50"),
          InlineKeyboardButton(text="100$", callback_data="cp_100")],
-        [InlineKeyboardButton(text="✏️  𝙎𝙫𝙤𝙮𝙖 𝙨𝙪𝙢𝙢𝙖", callback_data="cp_custom")],
-        [InlineKeyboardButton(text="⬅️  𝙉𝙖𝙯𝙖𝙙", callback_data="deposit_menu")],
+        [InlineKeyboardButton(text="✏️  Своя сумма", callback_data="cp_custom")],
+        [InlineKeyboardButton(text="◀️  Назад", callback_data="deposit_menu")],
     ])
 
 
@@ -264,19 +264,19 @@ def kb_ton_amounts():
          InlineKeyboardButton(text="2 TON", callback_data="ton_2"),
          InlineKeyboardButton(text="5 TON", callback_data="ton_5")],
         [InlineKeyboardButton(text="10 TON", callback_data="ton_10"),
-         InlineKeyboardButton(text="✏️  𝙎𝙫𝙤𝙮𝙖", callback_data="ton_custom")],
-        [InlineKeyboardButton(text="⬅️  𝙉𝙖𝙯𝙖𝙙", callback_data="deposit_menu")],
+         InlineKeyboardButton(text="✏️  Своя", callback_data="ton_custom")],
+        [InlineKeyboardButton(text="◀️  Назад", callback_data="deposit_menu")],
     ])
 
 
 def kb_stars_amounts():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="⭐ 50 Stars", callback_data="st_50"),
-         InlineKeyboardButton(text="⭐ 100 Stars", callback_data="st_100")],
-        [InlineKeyboardButton(text="⭐ 250 Stars", callback_data="st_250"),
-         InlineKeyboardButton(text="⭐ 500 Stars", callback_data="st_500")],
-        [InlineKeyboardButton(text="✏️  𝙎𝙫𝙤𝙮𝙖", callback_data="st_custom")],
-        [InlineKeyboardButton(text="⬅️  𝙉𝙖𝙯𝙖𝙙", callback_data="deposit_menu")],
+        [InlineKeyboardButton(text="⭐  50 Stars", callback_data="st_50"),
+         InlineKeyboardButton(text="⭐  100 Stars", callback_data="st_100")],
+        [InlineKeyboardButton(text="⭐  250 Stars", callback_data="st_250"),
+         InlineKeyboardButton(text="⭐  500 Stars", callback_data="st_500")],
+        [InlineKeyboardButton(text="✏️  Своя", callback_data="st_custom")],
+        [InlineKeyboardButton(text="◀️  Назад", callback_data="deposit_menu")],
     ])
 
 
@@ -300,10 +300,10 @@ async def cmd_start(m: types.Message):
                 except: pass
         except: pass
     await m.answer(
-        f"🚀  <b>R A I L T R Y</b>\n\n"
+        f"<b>🚀  R A I L T R Y</b>\n\n"
         f"👋  Привет, <b>{name}</b>!\n\n"
         f"💰  Баланс: <b>{fmt(u['balance'])}$</b>\n\n"
-        f"Выбери действие ниже 👇",
+        f"<i>Выбери действие ниже 👇</i>",
         reply_markup=reply_kb(uid), parse_mode="HTML"
     )
 
@@ -328,7 +328,7 @@ async def cmd_balance_group(m: types.Message):
         f"💰  <b>{u['username']}</b>\n\n"
         f"💵  Баланс: <b>{fmt(u['balance'])}$</b>",
         parse_mode="HTML"
-    )
+)
     
 
 # ==================== REPLY BUTTONS ====================
@@ -358,7 +358,7 @@ async def btn_bal(m: types.Message):
     await m.answer(
         f"💰  <b>Ваш баланс</b>\n\n"
         f"💵  Доступно: <b>{fmt(u['balance'])}$</b>\n\n"
-        f"Что хотите сделать?",
+        f"<i>Что хотите сделать?</i>",
         reply_markup=kb_balance(), parse_mode="HTML"
     )
 
@@ -446,7 +446,7 @@ async def cb_ref_link(cb: types.CallbackQuery):
 # ==================== ОЙЫН CALLBACKS ====================
 @dp.callback_query(F.data == "dice")
 async def cb_dice(cb: types.CallbackQuery):
-    await cb.message.edit_text("🎲  <b>КОСТИ</b>\n\nУгадай результат броска!",
+    await cb.message.edit_text("🎲  <b>КОСТИ</b>\n\n<i>Угадай результат броска!</i>",
                                 reply_markup=kb_dice(), parse_mode="HTML")
     await cb.answer()
 
@@ -456,7 +456,7 @@ async def cb_dice_bet(cb: types.CallbackQuery):
     uid = cb.from_user.id
     data = cb.data.replace("dice_", "")
     if data == "exact":
-        await cb.message.edit_text("🎯  <b>Угадай число</b>\n\nКакое число выпадет?",
+        await cb.message.edit_text("🎯  <b>Угадай число</b>\n\n<i>Какое число выпадет?</i>",
                                     reply_markup=kb_dice_num(), parse_mode="HTML")
         await cb.answer(); return
     if data.startswith("n_"):
@@ -471,7 +471,7 @@ async def cb_dice_bet(cb: types.CallbackQuery):
 
 @dp.callback_query(F.data == "darts")
 async def cb_darts(cb: types.CallbackQuery):
-    await cb.message.edit_text("🎯  <b>ДАРТС</b>\n\nКуда попадёт дротик?",
+    await cb.message.edit_text("🎯  <b>ДАРТС</b>\n\n<i>Куда попадёт дротик?</i>",
                                 reply_markup=kb_darts(), parse_mode="HTML")
     await cb.answer()
 
@@ -488,7 +488,7 @@ async def cb_darts_bet(cb: types.CallbackQuery):
 
 @dp.callback_query(F.data == "football")
 async def cb_football(cb: types.CallbackQuery):
-    await cb.message.edit_text("⚽  <b>ФУТБОЛ</b>\n\nЧто произойдёт?",
+    await cb.message.edit_text("⚽  <b>ФУТБОЛ</b>\n\n<i>Что произойдёт?</i>",
                                 reply_markup=kb_football(), parse_mode="HTML")
     await cb.answer()
 
@@ -505,7 +505,7 @@ async def cb_fb_bet(cb: types.CallbackQuery):
 
 @dp.callback_query(F.data == "basketball")
 async def cb_basketball(cb: types.CallbackQuery):
-    await cb.message.edit_text("🏀  <b>БАСКЕТБОЛ</b>\n\nЧто произойдёт?",
+    await cb.message.edit_text("🏀  <b>БАСКЕТБОЛ</b>\n\n<i>Что произойдёт?</i>",
                                 reply_markup=kb_basketball(), parse_mode="HTML")
     await cb.answer()
 
@@ -522,7 +522,7 @@ async def cb_bb_bet(cb: types.CallbackQuery):
 
 @dp.callback_query(F.data == "bowling")
 async def cb_bowling(cb: types.CallbackQuery):
-    await cb.message.edit_text("🎳  <b>БОУЛИНГ</b>\n\nВыбери тип ставки:",
+    await cb.message.edit_text("🎳  <b>БОУЛИНГ</b>\n\n<i>Выбери тип ставки:</i>",
                                 reply_markup=kb_bowling(), parse_mode="HTML")
     await cb.answer()
 
@@ -532,7 +532,7 @@ async def cb_bl_bet(cb: types.CallbackQuery):
     uid = cb.from_user.id
     data = cb.data.replace("bl_", "")
     if data == "exact":
-        await cb.message.edit_text("🎯  <b>Угадай сбито</b>\n\nСколько кеглей?",
+        await cb.message.edit_text("🎯  <b>Угадай сбито</b>\n\n<i>Сколько кеглей?</i>",
                                     reply_markup=kb_bowling_num(), parse_mode="HTML")
         await cb.answer(); return
     if data.startswith("n_"):
@@ -547,7 +547,7 @@ async def cb_bl_bet(cb: types.CallbackQuery):
 
 @dp.callback_query(F.data == "slot")
 async def cb_slot(cb: types.CallbackQuery):
-    await cb.message.edit_text("🎰  <b>777</b>\n\nПоймай Джекпот!",
+    await cb.message.edit_text("🎰  <b>777</b>\n\n<i>Поймай Джекпот!</i>",
                                 reply_markup=kb_slot(), parse_mode="HTML")
     await cb.answer()
 
@@ -687,7 +687,7 @@ async def msg_num(m: types.Message):
             txt = f"⚽  Выпало <b>{r}</b> → " + ("🥅 Удар об штангу ✅" if win else "Не штанга ❌")
         elif bt == "postgoal":
             win = (r == 2); mult = 5
-            txt = f"⚽  Выпало <b>{r}</b> → " + ("✨ Гол с помощью штанг ✅" if win else "Не гол ❌")
+            txt = f"⚽  Выпало <b>{r}</b> → " + ("✨ Гол со штанг ✅" if win else "Не гол ❌")
         await end_game(m, uid, val, win, mult, txt, "football")
         return
 
@@ -751,40 +751,44 @@ async def end_game(msg, uid, bet, win, mult, text_res, game_code):
         nb = round(u["balance"] + profit, 2)
         db_upd(uid, balance=nb, total_bets=round(u["total_bets"] + bet, 2),
                games_played=u["games_played"] + 1, total_won=round(u["total_won"] + profit, 2))
-        text = (f"🎉  <b>ПОБЕДА!</b>\n\n📊  {text_res}\n\n"
-                f"💵  Ставка: {fmt(bet)}$\n🎯  x{mult}\n"
-                f"➕  Выигрыш: <b>+{fmt(profit)}$</b>\n💰  Баланс: <b>{fmt(nb)}$</b>")
+        text = (f"<b>🎉  ПОБЕДА!</b>\n\n"
+                f"<i>📊  {text_res}</i>\n\n"
+                f"💵  Ставка: <code>{fmt(bet)}$</code>\n"
+                f"🎯  Коэффициент: <b>x{mult}</b>\n"
+                f"➕  Выигрыш: <b>+{fmt(profit)}$</b>\n"
+                f"💰  Баланс: <b>{fmt(nb)}$</b>")
     else:
         db_upd(uid, total_bets=round(u["total_bets"] + bet, 2), games_played=u["games_played"] + 1)
-        text = (f"😢  <b>ПРОИГРЫШ</b>\n\n📊  {text_res}\n\n"
-                f"💸  Потеряно: <b>-{fmt(bet)}$</b>\n💰  Баланс: <b>{fmt(u['balance'])}$</b>")
+        text = (f"<b>😢  ПРОИГРЫШ</b>\n\n"
+                f"<i>📊  {text_res}</i>\n\n"
+                f"💸  Потеряно: <code>-{fmt(bet)}$</code>\n"
+                f"💰  Баланс: <b>{fmt(u['balance'])}$</b>")
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="🔄  Снова", callback_data=game_code),
          InlineKeyboardButton(text="🏠  В меню", callback_data="menu_games")],
     ])
     await msg.answer(text, reply_markup=kb, parse_mode="HTML")
 
-    # 10$+ ставка каналга
     if bet >= BIG_BET and CHANNEL_ID:
         try:
             u2 = db_get(uid)
             nick = u2["username"]
             if win:
                 channel_text = (
-                    f"🏆  <b>КРУПНЫЙ ВЫИГРЫШ!</b>\n\n"
+                    f"<b>🏆  КРУПНЫЙ ВЫИГРЫШ!</b>\n\n"
                     f"👤  <b>{nick}</b>\n"
                     f"🎮  Игра: {game_code}\n"
-                    f"📊  {text_res}\n"
+                    f"<i>📊  {text_res}</i>\n"
                     f"💵  Ставка: <b>{fmt(bet)}$</b>\n"
                     f"🎯  x{mult}\n"
                     f"➕  Выигрыш: <b>+{fmt(profit)}$</b>"
                 )
             else:
                 channel_text = (
-                    f"💥  <b>КРУПНАЯ СТАВКА — ПРОИГРЫШ</b>\n\n"
+                    f"<b>💥  КРУПНАЯ СТАВКА — ПРОИГРЫШ</b>\n\n"
                     f"👤  <b>{nick}</b>\n"
                     f"🎮  Игра: {game_code}\n"
-                    f"📊  {text_res}\n"
+                    f"<i>📊  {text_res}</i>\n"
                     f"💵  Ставка: <b>{fmt(bet)}$</b>"
                 )
             await bot.send_message(CHANNEL_ID, channel_text, parse_mode="HTML")
@@ -797,7 +801,7 @@ async def end_game(msg, uid, bet, win, mult, text_res, game_code):
 async def cb_dep_menu(cb: types.CallbackQuery):
     await cb.message.edit_text(
         "💳  <b>Пополнение</b>\n\n"
-        "Выбери способ оплаты:\n\n"
+        "<i>Выбери способ оплаты:</i>\n\n"
         "💎  <b>CryptoBot</b> — USDT\n"
         "💠  <b>TonKeeper</b> — TON\n"
         "⭐  <b>Telegram Stars</b>",
@@ -809,7 +813,7 @@ async def cb_dep_menu(cb: types.CallbackQuery):
 @dp.callback_query(F.data == "dep_crypto")
 async def cb_dep_crypto(cb: types.CallbackQuery):
     await cb.message.edit_text(
-        "💎  <b>CryptoBot — USDT</b>\n\nВыбери сумму:",
+        "💎  <b>CryptoBot — USDT</b>\n\n<i>Выбери сумму:</i>",
         reply_markup=kb_crypto_amounts(), parse_mode="HTML"
     )
     await cb.answer()
@@ -839,7 +843,7 @@ async def do_crypto_deposit(msg, uid, amount):
         ])
         await msg.answer(
             f"💎  <b>Счёт на {amount}$</b>\n\n"
-            f"Оплати по кнопке ниже 👇",
+            f"<i>Оплати по кнопке ниже 👇</i>",
             reply_markup=kb, parse_mode="HTML"
         )
     except Exception as e:
@@ -860,13 +864,14 @@ async def cb_chk(cb: types.CallbackQuery):
             db_upd(uid, balance=nb, total_deposit=nd)
             try:
                 await cb.message.edit_text(
-                    f"✅  <b>Оплата подтверждена!</b>\n\n"
-                    f"💵  +{amount}$\n💰  Баланс: <b>{fmt(nb)}$</b>",
+                    f"<b>✅  Оплата подтверждена!</b>\n\n"
+                    f"💵  +{amount}$\n"
+                    f"💰  Баланс: <b>{fmt(nb)}$</b>",
                     parse_mode="HTML"
                 )
             except:
                 await cb.message.answer(
-                    f"✅  <b>+{amount}$</b>\n💰  Баланс: <b>{fmt(nb)}$</b>",
+                    f"<b>✅  +{amount}$</b>\n💰  Баланс: <b>{fmt(nb)}$</b>",
                     parse_mode="HTML"
                 )
             if u["ref"]:
@@ -887,7 +892,7 @@ async def cb_chk(cb: types.CallbackQuery):
 async def cb_dep_ton(cb: types.CallbackQuery):
     await cb.message.edit_text(
         f"💠  <b>TonKeeper — TON</b>\n\n"
-        f"Курс: 1 TON ≈ <b>{TON_USD}$</b>\n\n"
+        f"<i>Курс: 1 TON ≈ <b>{TON_USD}$</b></i>\n\n"
         f"Выбери сумму:",
         reply_markup=kb_ton_amounts(), parse_mode="HTML"
     )
@@ -915,14 +920,14 @@ async def do_ton_deposit(msg, uid, ton_amount):
         f"💠  <b>Оплата TON</b>\n\n"
         f"💵  Сумма: <b>{ton_amount} TON</b>\n"
         f"💰  Получишь: <b>{usd_amount}$</b>\n"
-        f"📊  Курс: 1 TON = {TON_USD}$\n\n"
+        f"📊  Курс: <i>1 TON = {TON_USD}$</i>\n\n"
         f"📮  Отправь TON на адрес:\n"
         f"<code>{TON_WALLET}</code>\n\n"
         f"⚠️  <b>Комментарий к переводу:</b>\n"
         f"<code>RT{uid}</code>",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="✅  Я оплатил", callback_data=f"toncheck_{uid}_{ton_amount}")],
-            [InlineKeyboardButton(text="⬅️  Назад", callback_data="deposit_menu")],
+            [InlineKeyboardButton(text="◀️  Назад", callback_data="deposit_menu")],
         ]),
         parse_mode="HTML"
     )
@@ -934,7 +939,7 @@ async def cb_toncheck(cb: types.CallbackQuery):
     uid, ton_amount = int(p[1]), float(p[2])
     await cb.message.answer(
         f"⏳  <b>Проверка платежа...</b>\n\n"
-        f"Админ проверит вручную.",
+        f"<i>Админ проверит вручную.</i>",
         parse_mode="HTML"
     )
     usd_amount = round(ton_amount * TON_USD, 2)
@@ -969,7 +974,7 @@ async def cmd_addton(m: types.Message):
     nd = round(u["total_deposit"] + usd, 2)
     db_upd(uid, balance=nb, total_deposit=nd)
     await m.answer(
-        f"✅  <b>Зачислено</b>\n\n"
+        f"<b>✅  Зачислено</b>\n\n"
         f"👤  User: <code>{uid}</code>\n"
         f"💠  {ton_amount} TON = {usd}$\n"
         f"💰  Баланс: {fmt(nb)}$",
@@ -977,7 +982,7 @@ async def cmd_addton(m: types.Message):
     )
     try:
         await bot.send_message(uid,
-            f"✅  <b>TON пополнение!</b>\n\n"
+            f"<b>✅  TON пополнение!</b>\n\n"
             f"💠  {ton_amount} TON\n"
             f"💰  +{usd}$",
             parse_mode="HTML")
@@ -988,7 +993,7 @@ async def cmd_addton(m: types.Message):
 async def cb_dep_stars(cb: types.CallbackQuery):
     await cb.message.edit_text(
         f"⭐  <b>Telegram Stars</b>\n\n"
-        f"Курс: 1 Star ≈ {STAR_USD}$\n\n"
+        f"<i>Курс: 1 Star ≈ {STAR_USD}$</i>\n\n"
         f"Выбери сумму:",
         reply_markup=kb_stars_amounts(), parse_mode="HTML"
     )
@@ -1039,7 +1044,7 @@ async def on_stars_paid(m: types.Message):
         nd = round(u["total_deposit"] + usd, 2)
         db_upd(uid, balance=nb, total_deposit=nd)
         await m.answer(
-            f"✅  <b>Оплата Stars успешна!</b>\n\n"
+            f"<b>✅  Оплата Stars успешна!</b>\n\n"
             f"⭐  {stars} Stars\n"
             f"💰  +{usd}$\n"
             f"💵  Баланс: <b>{fmt(nb)}$</b>",
@@ -1076,13 +1081,13 @@ async def do_withdraw(msg, uid, amount):
             [InlineKeyboardButton(text="💵  Получить", url=chk.bot_check_url)]
         ])
         await msg.answer(
-            f"✅  <b>Чек на {amount}$</b>\n\nАктивируй 👇",
+            f"<b>✅  Чек на {amount}$</b>\n\n<i>Активируй 👇</i>",
             reply_markup=kb, parse_mode="HTML"
         )
     except Exception as e:
         await msg.answer(
-            f"❌  <b>Вывод временно не работает</b>\n\n"
-            f"Попробуйте позже.",
+            f"<b>❌  Вывод временно не работает</b>\n\n"
+            f"<i>Попробуйте позже.</i>",
             parse_mode="HTML"
         )
 
@@ -1098,26 +1103,26 @@ async def cb_top_show(cb: types.CallbackQuery):
     if t == "bal":
         c.execute("SELECT username, balance FROM users WHERE balance>0 ORDER BY balance DESC LIMIT 10")
         rows = c.fetchall()
-        text = "💰  <b>ТОП ПО БАЛАНСУ</b>\n\n"
+        text = "<b>💰  ТОП ПО БАЛАНСУ</b>\n\n"
         for i, (n, b) in enumerate(rows, 1):
             m = medals[i - 1] if i <= 3 else f"<b>{i}.</b>"
             text += f"{m}  {n} — <b>{fmt(b)}$</b>\n"
     elif t == "g":
         c.execute("SELECT username, games_played FROM users WHERE games_played>0 ORDER BY games_played DESC LIMIT 10")
         rows = c.fetchall()
-        text = "🎮  <b>ТОП ИГРОКОВ</b>\n\n"
+        text = "<b>🎮  ТОП ИГРОКОВ</b>\n\n"
         for i, (n, g) in enumerate(rows, 1):
             m = medals[i - 1] if i <= 3 else f"<b>{i}.</b>"
             text += f"{m}  {n} — <b>{g}</b> игр\n"
     else:
         c.execute("SELECT username, refs FROM users WHERE refs>0 ORDER BY refs DESC LIMIT 10")
         rows = c.fetchall()
-        text = "👥  <b>ТОП РЕФЕРАЛОВ</b>\n\n"
+        text = "<b>👥  ТОП РЕФЕРАЛОВ</b>\n\n"
         for i, (n, r) in enumerate(rows, 1):
             m = medals[i - 1] if i <= 3 else f"<b>{i}.</b>"
             text += f"{m}  {n} — <b>{r}</b> реф.\n"
     conn.close()
-    if not rows: text += "Пока никого нет"
+    if not rows: text += "<i>Пока никого нет</i>"
     await cb.message.edit_text(text, reply_markup=kb_top(), parse_mode="HTML")
     await cb.answer()
 
@@ -1132,7 +1137,7 @@ async def cb_ad_stats(cb: types.CallbackQuery):
     r = c.fetchone()
     conn.close()
     await cb.message.edit_text(
-        f"📊  <b>Статистика</b>\n\n"
+        f"<b>📊  Статистика</b>\n\n"
         f"👥  Игроков: <b>{r[0] or 0}</b>\n"
         f"💰  Общий баланс: <b>{fmt(r[1] or 0)}$</b>\n"
         f"💵  Оборот: <b>{fmt(r[2] or 0)}$</b>\n"
@@ -1152,7 +1157,7 @@ async def cb_ad_users(cb: types.CallbackQuery):
     c.execute("SELECT username, balance, refs FROM users ORDER BY balance DESC LIMIT 30")
     rows = c.fetchall()
     conn.close()
-    text = "👥  <b>Все игроки</b>\n\n"
+    text = "<b>👥  Все игроки</b>\n\n"
     for i, (n, b, r) in enumerate(rows, 1):
         text += f"{i}. <b>{n}</b> — {fmt(b)}$ | {r} реф\n"
     await cb.message.edit_text(text, reply_markup=kb_admin(), parse_mode="HTML")
@@ -1163,7 +1168,7 @@ async def cb_ad_users(cb: types.CallbackQuery):
 async def cb_ad_multicheck(cb: types.CallbackQuery):
     if cb.from_user.id != ADMIN_ID: return
     await cb.message.answer(
-        "🎫  <b>МультиЧек</b>\n\n"
+        "<b>🎫  МультиЧек</b>\n\n"
         "<b>Команда:</b>\n"
         "<code>/multicheck 100 10 5</code>",
         parse_mode="HTML"
@@ -1180,9 +1185,9 @@ async def cb_ad_checks(cb: types.CallbackQuery):
     rows = c.fetchall()
     conn.close()
     if not rows:
-        text = "📋  Пока нет чеков"
+        text = "<i>📋  Пока нет чеков</i>"
     else:
-        text = "📋  <b>Список чеков</b>\n\n"
+        text = "<b>📋  Список чеков</b>\n\n"
         for code, total, slots, per_user, min_turnover, claimed, active in rows:
             status = "🟢" if active else "🔴"
             text += f"{status}  <code>{code}</code>\n"
@@ -1224,16 +1229,16 @@ async def cmd_multicheck(m: types.Message):
             ])
             await bot.send_message(
                 CHANNEL_ID,
-                f"🎫  <b>МУЛЬТИЧЕК</b>\n\n"
+                f"<b>🎫  МУЛЬТИЧЕК</b>\n\n"
                 f"💰  Сумма: <b>{fmt(total)}$</b>\n"
                 f"👥  Активаций: <b>{slots}</b>\n"
                 f"💵  Каждому: <b>{fmt(per_user)}$</b>\n"
                 f"📊  Мин. оборот: <b>{fmt(min_turnover)}$</b>\n\n"
-                f"👇  Нажми кнопку ниже:",
+                f"<i>👇  Нажми кнопку ниже:</i>",
                 reply_markup=kb, parse_mode="HTML"
             )
             await m.answer(
-                f"✅  <b>МультиЧек создан!</b>\n\n"
+                f"<b>✅  МультиЧек создан!</b>\n\n"
                 f"🎫  Код: <code>{code}</code>",
                 parse_mode="HTML"
             )
@@ -1301,7 +1306,7 @@ async def cb_mc_claim(cb: types.CallbackQuery):
     try:
         await bot.send_message(
             uid,
-            f"🎉  <b>Чек активирован!</b>\n\n"
+            f"<b>🎉  Чек активирован!</b>\n\n"
             f"🎫  <code>{code}</code>\n"
             f"💵  +{fmt(per_user)}$\n"
             f"💰  Баланс: <b>{fmt(nb)}$</b>",
@@ -1334,7 +1339,7 @@ async def cmd_bonuscheck(m: types.Message):
     nb = round(u["balance"] + amt, 2)
     db_upd(tid, balance=nb)
     await m.answer(
-        f"✅  <b>Бонус выдан</b>\n\n"
+        f"<b>✅  Бонус выдан</b>\n\n"
         f"👤  {u['username']}\n"
         f"➕  +{amt}$\n"
         f"💰  {fmt(nb)}$",
@@ -1342,21 +1347,21 @@ async def cmd_bonuscheck(m: types.Message):
     )
     try:
         await bot.send_message(tid,
-            f"🎁  <b>Вам выдан бонус!</b>\n\n➕  +{amt}$\n💰  {fmt(nb)}$",
+            f"<b>🎁  Вам выдан бонус!</b>\n\n➕  +{amt}$\n💰  {fmt(nb)}$",
             parse_mode="HTML")
     except: pass
 
 
 # ==================== АВТО-РАССЫЛКА ====================
 MOTIVATION_MESSAGES = [
-    "🔥  <b>Время пришло!</b>\n\n💰  Фортуна ждёт тебя\n🎲  Сделай ставку прямо сейчас!",
-    "🚀  <b>RAILTRY зовёт!</b>\n\n💎  Джекпот ждёт героя\n🎰  Попробуй свою удачу!",
-    "⚡  <b>Момент настал!</b>\n\n🏆  Крупный выигрыш близко\n🎯  Играй и побеждай!",
-    "💸  <b>Деньги ждут!</b>\n\n🎲  Один клик — большой куш\n🔥  Не упусти свой шанс!",
-    "👑  <b>Стань королём!</b>\n\n💰  Баланс растёт у смелых\n🎰  Сделай ставку сейчас!",
-    "🌟  <b>Твой звёздный час!</b>\n\n💎  Крути и выигрывай\n🚀  Удача любит рисковых!",
-    "🎯  <b>Хватит ждать!</b>\n\n💰  Ставка = шанс на мечту\n🔥  Играй прямо сейчас!",
-    "💥  <b>RAILTRY активен!</b>\n\n🎲  Сегодня твой день\n💰  Забери свой выигрыш!",
+    "<b>🔥  Время пришло!</b>\n\n💰  Фортуна ждёт тебя\n🎲  <i>Сделай ставку прямо сейчас!</i>",
+    "<b>🚀  RAILTRY зовёт!</b>\n\n💎  Джекпот ждёт героя\n🎰  <i>Попробуй свою удачу!</i>",
+    "<b>⚡  Момент настал!</b>\n\n🏆  Крупный выигрыш близко\n🎯  <i>Играй и побеждай!</i>",
+    "<b>💸  Деньги ждут!</b>\n\n🎲  Один клик — большой куш\n🔥  <i>Не упусти свой шанс!</i>",
+    "<b>👑  Стань королём!</b>\n\n💰  Баланс растёт у смелых\n🎰  <i>Сделай ставку сейчас!</i>",
+    "<b>🌟  Твой звёздный час!</b>\n\n💎  Крути и выигрывай\n🚀  <i>Удача любит рисковых!</i>",
+    "<b>🎯  Хватит ждать!</b>\n\n💰  Ставка = шанс на мечту\n🔥  <i>Играй прямо сейчас!</i>",
+    "<b>💥  RAILTRY активен!</b>\n\n🎲  Сегодня твой день\n💰  <i>Забери свой выигрыш!</i>",
 ]
 
 
@@ -1384,11 +1389,11 @@ async def auto_broadcast():
                         await asyncio.sleep(0.05)
                     except:
                         failed += 1
-                print(f"📢 Авто-рассылка: {sent} жіберілді | {failed} қате")
+                print(f"📢 Авто-рассылка: {sent} | қате: {failed}")
         except Exception as e:
-            print(f"❌ Авто-рассылка қатесі: {e}")
+            print(f"❌ Авто-рассылка: {e}")
 
-        await asyncio.sleep(10800)  # 3 сағат
+        await asyncio.sleep(10800)
 
 
 @dp.message(Command("dbinfo"))
@@ -1404,7 +1409,7 @@ async def cmd_dbinfo(m: types.Message):
     r = c.fetchone()
     conn.close()
     await m.answer(
-        f"📁  <b>Информация о БД</b>\n\n"
+        f"<b>📁  Информация о БД</b>\n\n"
         f"📂  <code>{DB_PATH}</code>\n"
         f"✅  Файл: {'есть' if file_exists else 'НЕТ'}\n"
         f"📦  Размер: <b>{file_size}</b> байт\n"
