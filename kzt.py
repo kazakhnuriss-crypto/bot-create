@@ -1185,4 +1185,160 @@ async def cmd_multicheck(m: types.Message):
                 parse_mode="HTML"
             )
         except Exception as e:
-            await m.answer(f"❌  Ошибка
+            await m.answer(f"❌  Ошибка: <code>{e}</code>", parse_mode="HTML")
+
+
+@dp.callback_query(F.data.startswith("mc_claim_"))
+async def cb_mc_claim(cb: types.CallbackQuery):
+    code = cb.data.replace("mc_claim_", "")
+    uid = cb.from_user.id
+    username = uname(cb.from_user)
+    u = db_get(uid, username)
+
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("SELECT total, slots, per_user, min_turnover, claimed, activated_by, active FROM multichecks WHERE code=?", (code,))
+    row = c.fetchone()
+    conn.close()
+
+    if not row:
+        await cb.answer("❌ Чек не найден", show_alert=True); return
+
+    total, slots, per_user, min_turnover, claimed, activated_by, active = row
+
+    if not active:
+        await cb.answer("❌ Чек завершён", show_alert=True); return
+
+    activated_list = activated_by.split(",") if activated_by else []
+    if str(uid) in activated_list:
+        await cb.answer("⚠️ Вы уже активировали!", show_alert=True); return
+
+    if claimed >= slots:
+        await cb.answer("❌ Все слоты заняты!", show_alert=True); return
+
+    if u["total_bets"] < min_turnover:
+        await cb.answer(
+            f"❌ Недостаточный оборот!\n\n"
+            f"Требуется: {fmt(min_turnover)}$\n"
+            f"У вас: {fmt(u['total_bets'])}$",
+            show_alert=True
+        )
+        return
+
+    new_claimed = claimed + 1
+    activated_list.append(str(uid))
+    new_activated = ",".join(activated_list)
+    new_active = 1 if new_claimed < slots else 0
+
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("UPDATE multichecks SET claimed=?, activated_by=?, active=? WHERE code=?",
+              (new_claimed, new_activated, new_active, code))
+    conn.commit()
+    conn.close()
+
+    nb = round(u["balance"] + per_user, 2)
+    db_upd(uid, balance=nb)
+
+    await cb.answer(
+        f"✅ Чек активирован!\n💵 +{fmt(per_user)}$\n💰 Баланс: {fmt(nb)}$",
+        show_alert=True
+    )
+
+    try:
+        await bot.send_message(
+            uid,
+            f"🎉  <b>Чек активирован!</b>\n\n"
+            f"🎫  <code>{code}</code>\n"
+            f"💵  +{fmt(per_user)}$\n"
+            f"💰  Баланс: <b>{fmt(nb)}$</b>",
+            parse_mode="HTML"
+        )
+    except: pass
+
+
+@dp.message(Command("bonuscheck"))
+async def cmd_bonuscheck(m: types.Message):
+    if m.from_user.id != ADMIN_ID: return
+    args = m.text.split()
+    tid = None; amt = None
+    if m.reply_to_message and len(args) >= 2:
+        tid = m.reply_to_message.from_user.id
+        try: amt = float(args[1])
+        except: return
+    elif len(args) >= 3 and args[1].startswith("@"):
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute("SELECT uid FROM users WHERE LOWER(username)=?", (args[1].lower(),))
+        r = c.fetchone(); conn.close()
+        if not r: await m.answer("❌  Не найден"); return
+        tid = r[0]
+        try: amt = float(args[2])
+        except: return
+    else:
+        await m.answer("📋  /bonuscheck 50 (ответом)\n/bonuscheck @user 50"); return
+    u = db_get(tid)
+    nb = round(u["balance"] + amt, 2)
+    db_upd(tid, balance=nb)
+    await m.answer(
+        f"✅  <b>Бонус выдан</b>\n\n"
+        f"👤  {u['username']}\n"
+        f"➕  +{amt}$\n"
+        f"💰  {fmt(nb)}$",
+        parse_mode="HTML"
+    )
+    try:
+        await bot.send_message(tid,
+            f"🎁  <b>Вам выдан бонус!</b>\n\n➕  +{amt}$\n💰  {fmt(nb)}$",
+            parse_mode="HTML")
+    except: pass
+
+
+@dp.message(Command("dbinfo"))
+async def cmd_dbinfo(m: types.Message):
+    if m.from_user.id != ADMIN_ID: return
+    file_exists = os.path.exists(DB_PATH)
+    file_size = os.path.getsize(DB_PATH) if file_exists else 0
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("SELECT COUNT(*) FROM users")
+    uc = c.fetchone()[0]
+    c.execute("SELECT SUM(balance), SUM(total_bets) FROM users")
+    r = c.fetchone()
+    conn.close()
+    await m.answer(
+        f"📁  <b>Информация о БД</b>\n\n"
+        f"📂  <code>{DB_PATH}</code>\n"
+        f"✅  Файл: {'есть' if file_exists else 'НЕТ'}\n"
+        f"📦  Размер: <b>{file_size}</b> байт\n"
+        f"👥  Игроков: <b>{uc}</b>\n"
+        f"💰  Баланс: <b>{fmt(r[0] or 0)}$</b>\n"
+        f"💵  Оборот: <b>{fmt(r[1] or 0)}$</b>",
+        parse_mode="HTML"
+    )
+
+
+@dp.callback_query(F.data == "noop")
+async def cb_noop(cb: types.CallbackQuery):
+    await cb.answer()
+
+
+# ==================== MAIN ====================
+async def main():
+    db_init()
+    print("=" * 40)
+    print("🚀  RAILTRY запущен!")
+    me = await bot.get_me()
+    print(f"Бот: @{me.username}")
+    print(f"📁 DB: {DB_PATH}")
+    print("=" * 40)
+    await dp.start_polling(bot)
+
+
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("\n⏹ Остановлен")
+    except Exception as e:
+        print(f"\n❌ КАТЕ: {e}")
