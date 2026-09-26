@@ -1342,7 +1342,7 @@ async def cb_top_show(cb: types.CallbackQuery):
     else:
         c.execute("SELECT username, refs FROM users WHERE refs>0 ORDER BY refs DESC LIMIT 10")
         rows = c.fetchall()
-            text = "<b>👥 ТОП РЕФЕРАЛОВ</b>\n<i>━━━━━━━━━━━━━━━</i>\n\n"
+        text = "<b>👥 ТОП РЕФЕРАЛОВ</b>\n<i>━━━━━━━━━━━━━━━</i>\n\n"
         for i, (n, r) in enumerate(rows, 1):
             m = medals[i - 1] if i <= 3 else f"<b>{i}.</b>"
             text += f"{m}  {n} — <b>{r}</b> реф.\n"
