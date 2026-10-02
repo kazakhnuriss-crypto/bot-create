@@ -19,7 +19,7 @@ TON_WALLET = os.getenv("TON_WALLET", "")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
 CHANNEL_ID = int(os.getenv("CHANNEL_ID", "0"))
 CHAT_LINK = os.getenv("CHAT_LINK", "")
-DB_PATH = os.getenv("DB_PATH", "railtry.db")
+DB_PATH = os.getenv("DB_PATH", "blackdice.db")
 
 BET_MIN = 0.1
 BET_MAX = 10000
@@ -31,6 +31,18 @@ STAR_USD = 0.013
 BIG_BET = 10
 JACKPOT_REWARD = 5.0
 JACKPOT_DAYS = 3
+
+# ==================== PREMIUM EMOJI ID ====================
+PE_DOLLAR_GREEN = "5280881372418816002"   # 💲 Жасыл доллар
+PE_TON          = "5197434882321567830"   # 💎 TON
+PE_PROFILE      = "5424905554432631390"   # 👤 Профиль
+PE_DOLLAR_HAND  = "5879770735999717115"   # 💵 Қолдағы доллар
+PE_DOLLAR_MONEY = "6156533171513986360"   # 💵 Жасыл доллар
+PE_DICE         = "5350314303352223876"   # 🎲 Кости
+PE_FOOTBALL     = "5345876910645721656"   # ⚽ Футбол
+PE_BASKETBALL   = "5346072890003439893"   # 🏀 Баскетбол
+PE_RED          = "5300781849981759479"   # 🔴 Красный
+PE_WHITE        = "5057942539345069225"   # ⚪ Белый
 
 logging.basicConfig(level=logging.INFO)
 bot = Bot(token=BOT_TOKEN)
@@ -140,95 +152,124 @@ def reply_kb(uid):
 
 
 def kb_games():
-    """Ойын түрлері — 6 эмодзи бір жолда + авторские"""
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🎲", callback_data="dice"),
-         InlineKeyboardButton(text="⚽", callback_data="football"),
-         InlineKeyboardButton(text="🏀", callback_data="basketball"),
-         InlineKeyboardButton(text="🎯", callback_data="darts"),
-         InlineKeyboardButton(text="🎳", callback_data="bowling"),
-         InlineKeyboardButton(text="🎰", callback_data="slot")],
-        [InlineKeyboardButton(text="👑  Авторские игры", callback_data="author_games")],
+        [InlineKeyboardButton(text="Кости", callback_data="dice",
+                              icon_custom_emoji_id=PE_DICE),
+         InlineKeyboardButton(text="Футбол", callback_data="football",
+                              icon_custom_emoji_id=PE_FOOTBALL)],
+        [InlineKeyboardButton(text="Баскетбол", callback_data="basketball",
+                              icon_custom_emoji_id=PE_BASKETBALL),
+         InlineKeyboardButton(text="Дартс", callback_data="darts",
+                              icon_custom_emoji_id=PE_RED)],
+        [InlineKeyboardButton(text="Боулинг", callback_data="bowling",
+                              icon_custom_emoji_id=PE_WHITE),
+         InlineKeyboardButton(text="777", callback_data="slot",
+                              icon_custom_emoji_id=PE_DOLLAR_GREEN)],
+        [InlineKeyboardButton(text="👑  Авторские игры", callback_data="author_games",
+                              icon_custom_emoji_id=PE_PROFILE)],
     ])
 
 
 def kb_author():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="💣  Мина", callback_data="mines"),
-         InlineKeyboardButton(text="💎  Алмаз", callback_data="diamond")],
-        [InlineKeyboardButton(text="🚀  Краш", callback_data="crash"),
-         InlineKeyboardButton(text="🎡  Колесо", callback_data="wheel")],
-        [InlineKeyboardButton(text="◀  Назад", callback_data="menu_games")],
+        [InlineKeyboardButton(text="💣  Мина", callback_data="mines",
+                              icon_custom_emoji_id=PE_DICE),
+         InlineKeyboardButton(text="💎  Алмаз", callback_data="diamond",
+                              icon_custom_emoji_id=PE_TON)],
+        [InlineKeyboardButton(text="🚀  Краш", callback_data="crash",
+                              icon_custom_emoji_id=PE_DOLLAR_MONEY),
+         InlineKeyboardButton(text="🎡  Колесо", callback_data="wheel",
+                              icon_custom_emoji_id=PE_RED)],
+        [InlineKeyboardButton(text="◀  Назад", callback_data="menu_games",
+                              icon_custom_emoji_id=PE_PROFILE)],
     ])
 
 
 def kb_dice():
-    """Кости — осы скриншоттағыдай стиль"""
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🎲 1 Бросок", callback_data="dice_1"),
-         InlineKeyboardButton(text="🎲 2 Броска", callback_data="dice_2"),
-         InlineKeyboardButton(text="🎲 3 Броска", callback_data="dice_3")],
-        [InlineKeyboardButton(text="Чёт  (x2)", callback_data="dice_even"),
-         InlineKeyboardButton(text="Нечёт  (x2)", callback_data="dice_odd")],
-        [InlineKeyboardButton(text="Меньше  (x2)", callback_data="dice_less"),
-         InlineKeyboardButton(text="Больше  (x2)", callback_data="dice_more")],
-        [InlineKeyboardButton(text="1 (x6)", callback_data="dice_n_1"),
-         InlineKeyboardButton(text="2 (x6)", callback_data="dice_n_2"),
-         InlineKeyboardButton(text="3 (x6)", callback_data="dice_n_3")],
-        [InlineKeyboardButton(text="4 (x6)", callback_data="dice_n_4"),
-         InlineKeyboardButton(text="5 (x6)", callback_data="dice_n_5"),
-         InlineKeyboardButton(text="6 (x6)", callback_data="dice_n_6")],
-        [InlineKeyboardButton(text="Лесенка  (x2.2)", callback_data="dice_ladder")],
-        [InlineKeyboardButton(text="◀  Назад", callback_data="menu_games")],
+        [InlineKeyboardButton(text="⬆  Больше", callback_data="dice_more",
+                              icon_custom_emoji_id=PE_DICE)],
+        [InlineKeyboardButton(text="⬇  Меньше", callback_data="dice_less",
+                              icon_custom_emoji_id=PE_DICE)],
+        [InlineKeyboardButton(text="Чёт", callback_data="dice_even",
+                              icon_custom_emoji_id=PE_WHITE)],
+        [InlineKeyboardButton(text="Нечёт", callback_data="dice_odd",
+                              icon_custom_emoji_id=PE_RED)],
+        [InlineKeyboardButton(text="🎯  Угадать число", callback_data="dice_exact",
+                              icon_custom_emoji_id=PE_DOLLAR_GREEN)],
+        [InlineKeyboardButton(text="◀  Назад", callback_data="menu_games",
+                              icon_custom_emoji_id=PE_PROFILE)],
+    ])
+
+
+def kb_dice_num():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="1", callback_data="dice_n_1",
+                              icon_custom_emoji_id=PE_DICE),
+         InlineKeyboardButton(text="2", callback_data="dice_n_2",
+                              icon_custom_emoji_id=PE_DICE),
+         InlineKeyboardButton(text="3", callback_data="dice_n_3",
+                              icon_custom_emoji_id=PE_DICE)],
+        [InlineKeyboardButton(text="4", callback_data="dice_n_4",
+                              icon_custom_emoji_id=PE_DICE),
+         InlineKeyboardButton(text="5", callback_data="dice_n_5",
+                              icon_custom_emoji_id=PE_DICE),
+         InlineKeyboardButton(text="6", callback_data="dice_n_6",
+                              icon_custom_emoji_id=PE_DICE)],
+        [InlineKeyboardButton(text="◀  Назад", callback_data="dice",
+                              icon_custom_emoji_id=PE_PROFILE)],
     ])
 
 
 def kb_darts():
-    """Дартс — осы стильде"""
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🎯 1 Бросок", callback_data="darts_1"),
-         InlineKeyboardButton(text="🎯 2 Броска", callback_data="darts_2"),
-         InlineKeyboardButton(text="🎯 3 Броска", callback_data="darts_3")],
-        [InlineKeyboardButton(text="🔴 Красный  (x3)", callback_data="darts_red"),
-         InlineKeyboardButton(text="⚪ Белый  (x3)", callback_data="darts_white")],
-        [InlineKeyboardButton(text="🎯 Центр  (x6)", callback_data="darts_center"),
-         InlineKeyboardButton(text="↩ Отскок  (x6)", callback_data="darts_bounce")],
-        [InlineKeyboardButton(text="✨ Дубль  (x6)", callback_data="darts_double")],
-        [InlineKeyboardButton(text="◀  Назад", callback_data="menu_games")],
+        [InlineKeyboardButton(text="🔴  Красный", callback_data="darts_red",
+                              icon_custom_emoji_id=PE_RED)],
+        [InlineKeyboardButton(text="⚪  Белый", callback_data="darts_white",
+                              icon_custom_emoji_id=PE_WHITE)],
+        [InlineKeyboardButton(text="🎯  Центр", callback_data="darts_center",
+                              icon_custom_emoji_id=PE_RED)],
+        [InlineKeyboardButton(text="↩  Отскок", callback_data="darts_bounce",
+                              icon_custom_emoji_id=PE_WHITE)],
+        [InlineKeyboardButton(text="◀  Назад", callback_data="menu_games",
+                              icon_custom_emoji_id=PE_PROFILE)],
     ])
 
 
 def kb_football():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="⚽ 1 Бросок", callback_data="fb_1"),
-         InlineKeyboardButton(text="⚽ 2 Броска", callback_data="fb_2")],
-        [InlineKeyboardButton(text="⚽ Чистый гол  (x1.7)", callback_data="fb_goal"),
-         InlineKeyboardButton(text="❌ Промах  (x2)", callback_data="fb_miss")],
-        [InlineKeyboardButton(text="🥅 Штанга  (x3)", callback_data="fb_post"),
-         InlineKeyboardButton(text="✨ Гол со штанг  (x5)", callback_data="fb_postgoal")],
-        [InlineKeyboardButton(text="◀  Назад", callback_data="menu_games")],
+        [InlineKeyboardButton(text="⚽  Чистый гол", callback_data="fb_goal",
+                              icon_custom_emoji_id=PE_FOOTBALL)],
+        [InlineKeyboardButton(text="❌  Промах", callback_data="fb_miss",
+                              icon_custom_emoji_id=PE_RED)],
+        [InlineKeyboardButton(text="🥅  Штанга", callback_data="fb_post",
+                              icon_custom_emoji_id=PE_FOOTBALL)],
+        [InlineKeyboardButton(text="◀  Назад", callback_data="menu_games",
+                              icon_custom_emoji_id=PE_PROFILE)],
     ])
 
 
 def kb_basketball():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🏀 1 Бросок", callback_data="bb_1"),
-         InlineKeyboardButton(text="🏀 2 Броска", callback_data="bb_2")],
-        [InlineKeyboardButton(text="🏀 Чистый гол  (x2.5)", callback_data="bb_goal"),
-         InlineKeyboardButton(text="❌ Промах  (x1.77)", callback_data="bb_miss")],
-        [InlineKeyboardButton(text="🌀 Прокрут  (x3)", callback_data="bb_spin")],
-        [InlineKeyboardButton(text="◀  Назад", callback_data="menu_games")],
+        [InlineKeyboardButton(text="🏀  Чистый гол", callback_data="bb_goal",
+                              icon_custom_emoji_id=PE_BASKETBALL)],
+        [InlineKeyboardButton(text="❌  Промах", callback_data="bb_miss",
+                              icon_custom_emoji_id=PE_RED)],
+        [InlineKeyboardButton(text="◀  Назад", callback_data="menu_games",
+                              icon_custom_emoji_id=PE_PROFILE)],
     ])
 
 
 def kb_bowling():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🎳 1 Бросок", callback_data="bowl_1"),
-         InlineKeyboardButton(text="🎳 2 Броска", callback_data="bowl_2")],
-        [InlineKeyboardButton(text="🎳 Страйк  (x6)", callback_data="bl_strike"),
-         InlineKeyboardButton(text="❌ Промах  (x6)", callback_data="bl_miss")],
-        [InlineKeyboardButton(text="🎯 Угадать сбито  (x8)", callback_data="bl_exact")],
-        [InlineKeyboardButton(text="◀  Назад", callback_data="menu_games")],
+        [InlineKeyboardButton(text="❌  Промах", callback_data="bl_miss",
+                              icon_custom_emoji_id=PE_RED)],
+        [InlineKeyboardButton(text="🎳  Страйк", callback_data="bl_strike",
+                              icon_custom_emoji_id=PE_WHITE)],
+        [InlineKeyboardButton(text="🎯  Угадать сбито", callback_data="bl_exact",
+                              icon_custom_emoji_id=PE_DICE)],
+        [InlineKeyboardButton(text="◀  Назад", callback_data="menu_games",
+                              icon_custom_emoji_id=PE_PROFILE)],
     ])
 
 
@@ -240,89 +281,127 @@ def kb_bowling_num():
         [InlineKeyboardButton(text="4", callback_data="bl_n_4"),
          InlineKeyboardButton(text="5", callback_data="bl_n_5"),
          InlineKeyboardButton(text="6", callback_data="bl_n_6")],
-        [InlineKeyboardButton(text="◀  Назад", callback_data="bowling")],
+        [InlineKeyboardButton(text="◀  Назад", callback_data="bowling",
+                              icon_custom_emoji_id=PE_PROFILE)],
     ])
 
 
 def kb_slot():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🎰 777 Джекпот  (x30)", callback_data="slot_777")],
-        [InlineKeyboardButton(text="◀  Назад", callback_data="menu_games")],
+        [InlineKeyboardButton(text="🎰  777 Джекпот", callback_data="slot_777",
+                              icon_custom_emoji_id=PE_DOLLAR_GREEN)],
+        [InlineKeyboardButton(text="◀  Назад", callback_data="menu_games",
+                              icon_custom_emoji_id=PE_PROFILE)],
     ])
 
 
 def kb_top():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="💰  По балансу", callback_data="top_bal"),
-         InlineKeyboardButton(text="🎮  По играм", callback_data="top_g")],
-        [InlineKeyboardButton(text="👥  По рефералам", callback_data="top_r")],
+        [InlineKeyboardButton(text="💰  По балансу", callback_data="top_bal",
+                              icon_custom_emoji_id=PE_DOLLAR_GREEN),
+         InlineKeyboardButton(text="🎮  По играм", callback_data="top_g",
+                              icon_custom_emoji_id=PE_DICE)],
+        [InlineKeyboardButton(text="👥  По рефералам", callback_data="top_r",
+                              icon_custom_emoji_id=PE_PROFILE)],
     ])
 
 
 def kb_balance():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="💳  Пополнить", callback_data="deposit_menu"),
-         InlineKeyboardButton(text="📤  Вывести", callback_data="withdraw")],
+        [InlineKeyboardButton(text="💳  Пополнить", callback_data="deposit_menu",
+                              icon_custom_emoji_id=PE_DOLLAR_GREEN),
+         InlineKeyboardButton(text="📤  Вывести", callback_data="withdraw",
+                              icon_custom_emoji_id=PE_DOLLAR_HAND)],
     ])
 
 
 def kb_profile():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="👥  Рефералка", callback_data="ref_link")],
-        [InlineKeyboardButton(text="📊  Моя статистика", callback_data="my_stats")],
+        [InlineKeyboardButton(text="👥  Рефералка", callback_data="ref_link",
+                              icon_custom_emoji_id=PE_PROFILE)],
+        [InlineKeyboardButton(text="📊  Моя статистика", callback_data="my_stats",
+                              icon_custom_emoji_id=PE_DOLLAR_MONEY)],
     ])
 
 
 def kb_admin():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="📊  Статистика", callback_data="ad_stats"),
-         InlineKeyboardButton(text="👥  Игроки", callback_data="ad_users")],
-        [InlineKeyboardButton(text="🎫  МультиЧек", callback_data="ad_multicheck")],
-        [InlineKeyboardButton(text="📋  Активные чеки", callback_data="ad_checks")],
+        [InlineKeyboardButton(text="📊  Статистика", callback_data="ad_stats",
+                              icon_custom_emoji_id=PE_DOLLAR_MONEY),
+         InlineKeyboardButton(text="👥  Игроки", callback_data="ad_users",
+                              icon_custom_emoji_id=PE_PROFILE)],
+        [InlineKeyboardButton(text="🎫  МультиЧек", callback_data="ad_multicheck",
+                              icon_custom_emoji_id=PE_DOLLAR_HAND)],
+        [InlineKeyboardButton(text="📋  Активные чеки", callback_data="ad_checks",
+                              icon_custom_emoji_id=PE_DOLLAR_GREEN)],
     ])
 
 
 def kb_deposit_menu():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="💎  CryptoBot (USDT)", callback_data="dep_crypto")],
-        [InlineKeyboardButton(text="💠  TonKeeper (TON)", callback_data="dep_ton")],
-        [InlineKeyboardButton(text="⭐  Telegram Stars", callback_data="dep_stars")],
-        [InlineKeyboardButton(text="◀  Назад", callback_data="menu_balance")],
+        [InlineKeyboardButton(text="CryptoBot (USDT)", callback_data="dep_crypto",
+                              icon_custom_emoji_id=PE_DOLLAR_GREEN)],
+        [InlineKeyboardButton(text="TonKeeper (TON)", callback_data="dep_ton",
+                              icon_custom_emoji_id=PE_TON)],
+        [InlineKeyboardButton(text="Telegram Stars", callback_data="dep_stars",
+                              icon_custom_emoji_id=PE_DOLLAR_HAND)],
+        [InlineKeyboardButton(text="◀  Назад", callback_data="menu_balance",
+                              icon_custom_emoji_id=PE_PROFILE)],
     ])
 
 
 def kb_crypto_amounts():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="1$", callback_data="cp_1"),
-         InlineKeyboardButton(text="5$", callback_data="cp_5"),
-         InlineKeyboardButton(text="10$", callback_data="cp_10")],
-        [InlineKeyboardButton(text="25$", callback_data="cp_25"),
-         InlineKeyboardButton(text="50$", callback_data="cp_50"),
-         InlineKeyboardButton(text="100$", callback_data="cp_100")],
-        [InlineKeyboardButton(text="✏  Своя сумма", callback_data="cp_custom")],
-        [InlineKeyboardButton(text="◀  Назад", callback_data="deposit_menu")],
+        [InlineKeyboardButton(text="1$", callback_data="cp_1",
+                              icon_custom_emoji_id=PE_DOLLAR_GREEN),
+         InlineKeyboardButton(text="5$", callback_data="cp_5",
+                              icon_custom_emoji_id=PE_DOLLAR_GREEN),
+         InlineKeyboardButton(text="10$", callback_data="cp_10",
+                              icon_custom_emoji_id=PE_DOLLAR_GREEN)],
+        [InlineKeyboardButton(text="25$", callback_data="cp_25",
+                              icon_custom_emoji_id=PE_DOLLAR_MONEY),
+         InlineKeyboardButton(text="50$", callback_data="cp_50",
+                              icon_custom_emoji_id=PE_DOLLAR_MONEY),
+         InlineKeyboardButton(text="100$", callback_data="cp_100",
+                              icon_custom_emoji_id=PE_DOLLAR_MONEY)],
+        [InlineKeyboardButton(text="✏  Своя сумма", callback_data="cp_custom",
+                              icon_custom_emoji_id=PE_DOLLAR_HAND)],
+        [InlineKeyboardButton(text="◀  Назад", callback_data="deposit_menu",
+                              icon_custom_emoji_id=PE_PROFILE)],
     ])
 
 
 def kb_ton_amounts():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="1 TON", callback_data="ton_1"),
-         InlineKeyboardButton(text="2 TON", callback_data="ton_2"),
-         InlineKeyboardButton(text="5 TON", callback_data="ton_5")],
-        [InlineKeyboardButton(text="10 TON", callback_data="ton_10"),
-         InlineKeyboardButton(text="✏  Своя", callback_data="ton_custom")],
-        [InlineKeyboardButton(text="◀  Назад", callback_data="deposit_menu")],
+        [InlineKeyboardButton(text="1 TON", callback_data="ton_1",
+                              icon_custom_emoji_id=PE_TON),
+         InlineKeyboardButton(text="2 TON", callback_data="ton_2",
+                              icon_custom_emoji_id=PE_TON),
+         InlineKeyboardButton(text="5 TON", callback_data="ton_5",
+                              icon_custom_emoji_id=PE_TON)],
+        [InlineKeyboardButton(text="10 TON", callback_data="ton_10",
+                              icon_custom_emoji_id=PE_TON),
+         InlineKeyboardButton(text="✏  Своя", callback_data="ton_custom",
+                              icon_custom_emoji_id=PE_DOLLAR_HAND)],
+        [InlineKeyboardButton(text="◀  Назад", callback_data="deposit_menu",
+                              icon_custom_emoji_id=PE_PROFILE)],
     ])
 
 
 def kb_stars_amounts():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="⭐  50 Stars", callback_data="st_50"),
-         InlineKeyboardButton(text="⭐  100 Stars", callback_data="st_100")],
-        [InlineKeyboardButton(text="⭐  250 Stars", callback_data="st_250"),
-         InlineKeyboardButton(text="⭐  500 Stars", callback_data="st_500")],
-        [InlineKeyboardButton(text="✏  Своя", callback_data="st_custom")],
-        [InlineKeyboardButton(text="◀  Назад", callback_data="deposit_menu")],
+        [InlineKeyboardButton(text="50 Stars", callback_data="st_50",
+                              icon_custom_emoji_id=PE_DOLLAR_HAND),
+         InlineKeyboardButton(text="100 Stars", callback_data="st_100",
+                              icon_custom_emoji_id=PE_DOLLAR_HAND)],
+        [InlineKeyboardButton(text="250 Stars", callback_data="st_250",
+                              icon_custom_emoji_id=PE_DOLLAR_MONEY),
+         InlineKeyboardButton(text="500 Stars", callback_data="st_500",
+                              icon_custom_emoji_id=PE_DOLLAR_MONEY)],
+        [InlineKeyboardButton(text="✏  Своя", callback_data="st_custom",
+                              icon_custom_emoji_id=PE_DOLLAR_HAND)],
+        [InlineKeyboardButton(text="◀  Назад", callback_data="deposit_menu",
+                              icon_custom_emoji_id=PE_PROFILE)],
     ])
     
 
@@ -348,7 +427,7 @@ async def cmd_start(m: types.Message):
         except: pass
     prem_badge = "⭐ <b>PREMIUM</b>" if u["is_premium"] else ""
     await m.answer(
-        f"<b>🚀  R A I L T R Y</b>\n"
+        f"<b>🎲  B L A C K  D I C E</b>\n"
         f"<i>━━━━━━━━━━━━━━━</i>\n\n"
         f"👋  Привет, <b>{name}</b>! {prem_badge}\n\n"
         f"💰  Баланс: <b>{fmt(u['balance'])}$</b>\n\n"
@@ -539,6 +618,12 @@ async def cb_dice(cb: types.CallbackQuery):
 async def cb_dice_bet(cb: types.CallbackQuery):
     uid = cb.from_user.id
     data = cb.data.replace("dice_", "")
+    if data == "exact":
+        await cb.message.edit_text(
+            f"<b>🎯  Угадай число</b>\n\n<i>Какое число выпадет?</i>",
+            reply_markup=kb_dice_num(), parse_mode="HTML"
+        )
+        await cb.answer(); return
     awaiting[uid] = {"game": "dice", "bet": data}
     u = db_get(uid)
     await cb.message.answer(
@@ -591,10 +676,7 @@ async def cb_football(cb: types.CallbackQuery):
 async def cb_fb_bet(cb: types.CallbackQuery):
     uid = cb.from_user.id
     bt = cb.data.replace("fb_", "")
-    if bt in ["1", "2"]:
-        awaiting[uid] = {"game": "football", "bet": "goal"}
-    else:
-        awaiting[uid] = {"game": "football", "bet": bt}
+    awaiting[uid] = {"game": "football", "bet": bt}
     u = db_get(uid)
     await cb.message.answer(
         f"<b>⚽  Футбол</b>\n\n"
@@ -620,10 +702,7 @@ async def cb_basketball(cb: types.CallbackQuery):
 async def cb_bb_bet(cb: types.CallbackQuery):
     uid = cb.from_user.id
     bt = cb.data.replace("bb_", "")
-    if bt in ["1", "2"]:
-        awaiting[uid] = {"game": "basketball", "bet": "goal"}
-    else:
-        awaiting[uid] = {"game": "basketball", "bet": bt}
+    awaiting[uid] = {"game": "basketball", "bet": bt}
     u = db_get(uid)
     await cb.message.answer(
         f"<b>🏀  Баскетбол</b>\n\n"
@@ -660,20 +739,6 @@ async def cb_bl_bet(cb: types.CallbackQuery):
         awaiting[uid] = {"game": "bowling", "bet": f"n_{n}"}
     else:
         awaiting[uid] = {"game": "bowling", "bet": data}
-    u = db_get(uid)
-    await cb.message.answer(
-        f"<b>🎳  Боулинг</b>\n\n"
-        f"💰  Баланс: <b>{fmt(u['balance'])}$</b>\n\n"
-        f"✏  Введи сумму:",
-        parse_mode="HTML"
-    )
-    await cb.answer()
-
-
-@dp.callback_query(F.data.startswith("bowl_"))
-async def cb_bowl_throws(cb: types.CallbackQuery):
-    uid = cb.from_user.id
-    awaiting[uid] = {"game": "bowling", "bet": "strike"}
     u = db_get(uid)
     await cb.message.answer(
         f"<b>🎳  Боулинг</b>\n\n"
@@ -819,10 +884,6 @@ async def msg_num(m: types.Message):
         elif bt == "odd":
             win = r in [1, 3, 5]
             txt = f"Выпало <b>{r}</b> → " + ("Нечётное ✅" if win else "Не нечётное ❌")
-        elif bt == "ladder":
-            win = r in [1, 6]
-            mult = 2.2
-            txt = f"Выпало <b>{r}</b> → " + ("Лесенка ✅" if win else "Не лесенка ❌")
         elif bt.startswith("n_"):
             n = int(bt.replace("n_", ""))
             mult = 6
@@ -838,22 +899,19 @@ async def msg_num(m: types.Message):
         await asyncio.sleep(4)
         r = dm.dice.value
         win = False
-        mult = 3
+        mult = 2.5
         if bt == "red":
-            win = (r == 2); mult = 3
+            win = (r == 2)
             txt = f"Выпало <b>{r}</b> → " + ("🔴 Красный ✅" if win else "Не красный ❌")
         elif bt == "white":
-            win = (r == 3); mult = 3
+            win = (r == 3)
             txt = f"Выпало <b>{r}</b> → " + ("⚪ Белый ✅" if win else "Не белый ❌")
         elif bt == "center":
-            win = (r == 6); mult = 6
+            win = (r == 6); mult = 5
             txt = f"Выпало <b>{r}</b> → " + ("🎯 Центр ✅" if win else "Не центр ❌")
         elif bt == "bounce":
-            win = (r == 5); mult = 6
+            win = (r == 5); mult = 5
             txt = f"Выпало <b>{r}</b> → " + ("↩ Отскок ✅" if win else "Не отскок ❌")
-        elif bt == "double":
-            win = (r == 4); mult = 6
-            txt = f"Выпало <b>{r}</b> → " + ("✨ Дубль ✅" if win else "Не дубль ❌")
         await end_game(m, uid, val, win, mult, txt, "darts", dm)
         return
 
@@ -874,9 +932,6 @@ async def msg_num(m: types.Message):
         elif bt == "post":
             win = (r == 1); mult = 3
             txt = f"Выпало <b>{r}</b> → " + ("🥅 Штанга ✅" if win else "Не штанга ❌")
-        elif bt == "postgoal":
-            win = (r == 2); mult = 5
-            txt = f"Выпало <b>{r}</b> → " + ("✨ Гол со штанг ✅" if win else "Не гол ❌")
         await end_game(m, uid, val, win, mult, txt, "football", dm)
         return
 
@@ -894,9 +949,6 @@ async def msg_num(m: types.Message):
         elif bt == "miss":
             win = r in [1, 3]; mult = 1.77
             txt = f"Выпало <b>{r}</b> → " + ("❌ Промах ✅" if win else "Не промах ❌")
-        elif bt == "spin":
-            win = (r == 2); mult = 3
-            txt = f"Выпало <b>{r}</b> → " + ("🌀 Прокрут ✅" if win else "Не прокрут ❌")
         await end_game(m, uid, val, win, mult, txt, "basketball", dm)
         return
 
@@ -951,7 +1003,7 @@ async def msg_num(m: types.Message):
         await end_game(m, uid, val, win, mult, txt, "slot", dm)
         return
 
-    # ===== АВТОРСКИЕ ИГРЫ =====
+    # ===== АВТОРСКИЕ =====
     if g == "mines":
         cells = [0] * 9
         mine_pos = random.randint(0, 8)
@@ -974,13 +1026,12 @@ async def msg_num(m: types.Message):
 
     if g == "diamond":
         win = random.random() < 0.35
-        mult = 3
-        txt = "💎 Алмаз найден" if win else "❌ Не найден"
-        await end_game(m, uid, val, win, mult, txt, "diamond")
+        txt = "💎 Алмаз найден ✅" if win else "❌ Не найден"
+        await end_game(m, uid, val, win, 3, txt, "diamond")
         return
 
     if g == "crash":
-        mult = round(random.uniform(1.1, 10), 2)
+        mult = round(random.uniform(1.1, 5), 2)
         win = random.random() < 0.35
         txt = f"🚀 Ракета: x{mult}"
         await end_game(m, uid, val, win, mult, txt, "crash")
@@ -1169,7 +1220,7 @@ async def do_crypto_deposit(msg, uid, amount):
         await msg.answer("❌  CryptoBot недоступен"); return
     try:
         inv = await crypto.create_invoice(asset="USDT", amount=amount,
-            description=f"RailTry #{uid}", payload=f"dep_{uid}_{amount}", expires_in=1800)
+            description=f"BlackDice #{uid}", payload=f"dep_{uid}_{amount}", expires_in=1800)
         kb = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="💳  Оплатить", url=inv.bot_invoice_url)],
             [InlineKeyboardButton(text="✅  Проверить", callback_data=f"chk_{inv.invoice_id}_{amount}")],
@@ -1326,7 +1377,7 @@ async def do_stars_invoice(msg, uid, stars):
         await bot.send_invoice(
             chat_id=uid,
             title="⭐ Пополнение баланса",
-            description=f"+{usd}$ на баланс RailTry",
+            description=f"+{usd}$ на баланс BlackDice",
             payload=f"stars_{uid}_{stars}",
             provider_token="",
             currency="XTR",
@@ -1401,13 +1452,6 @@ async def do_withdraw(msg, uid, amount):
                     parse_mode="HTML"
                 )
             except: pass
-        try:
-            await bot.send_message(
-                ADMIN_ID,
-                f"<b>📤  Вывод</b>\n\n👤  {u['username']}\n💵  {fmt(amount)}$\n🔗 {chk.bot_check_url}",
-                parse_mode="HTML"
-            )
-        except: pass
     except Exception as e:
         await msg.answer(
             f"<b>❌  Вывод временно не работает</b>\n\n<i>Попробуйте позже.</i>",
@@ -1662,16 +1706,31 @@ async def cmd_bonuscheck(m: types.Message):
     except: pass
 
 
-# ==================== АВТО-РАССЫЛКА (1 САҒАТ) ====================
-MOTIVATION_MESSAGES = [
-    f"<b>🔥  Время пришло!</b>\n<i>━━━━━━━━━━━━━━━</i>\n\n💰  Фортуна ждёт тебя\n🎲  <i>Сделай ставку прямо сейчас!</i>",
-    f"<b>🚀  RAILTRY зовёт!</b>\n<i>━━━━━━━━━━━━━━━</i>\n\n💎  Джекпот ждёт героя\n🎰  <i>Попробуй свою удачу!</i>",
-    f"<b>⚡  Момент настал!</b>\n<i>━━━━━━━━━━━━━━━</i>\n\n🏆  Крупный выигрыш близко\n🎯  <i>Играй и побеждай!</i>",
-    f"<b>💸  Деньги ждут!</b>\n<i>━━━━━━━━━━━━━━━</i>\n\n🎲  Один клик — большой куш\n🔥  <i>Не упусти свой шанс!</i>",
-    f"<b>👑  Стань королём!</b>\n<i>━━━━━━━━━━━━━━━</i>\n\n💰  Баланс растёт у смелых\n🎰  <i>Сделай ставку сейчас!</i>",
-    f"<b>🌟  Твой звёздный час!</b>\n<i>━━━━━━━━━━━━━━━</i>\n\n💎  Крути и выигрывай\n🚀  <i>Удача любит рисковых!</i>",
-    f"<b>🎯  Хватит ждать!</b>\n<i>━━━━━━━━━━━━━━━</i>\n\n💰  Ставка = шанс на мечту\n🔥  <i>Играй прямо сейчас!</i>",
-    f"<b>💥  RAILTRY активен!</b>\n<i>━━━━━━━━━━━━━━━</i>\n\n🎲  Сегодня твой день\n💰  <i>Забери свой выигрыш!</i>",
+# ==================== АВТО-РАССЫЛКА ====================
+BROADCAST_MESSAGES = [
+    f"<b>☀️  Доброе утро, дорогие игроки!</b>\n"
+    f"<i>━━━━━━━━━━━━━━━</i>\n\n"
+    f"🎮  Новый день — новые победы!\n"
+    f"💰  Пополни баланс и начни играть!\n\n"
+    f"<i>🍀  Желаем удачи и больших выигрышей!</i>",
+
+    f"<b>🌟  Хорошего дня, игроки!</b>\n"
+    f"<i>━━━━━━━━━━━━━━━</i>\n\n"
+    f"🎲  Испытай свою удачу прямо сейчас!\n"
+    f"🏆  Крупные выигрыши ждут тебя!\n\n"
+    f"<i>🔥  Играй и побеждай!</i>",
+
+    f"<b>🌙  Добрый вечер, дорогие игроки!</b>\n"
+    f"<i>━━━━━━━━━━━━━━━</i>\n\n"
+    f"🎮  Вечер — лучшее время для игры!\n"
+    f"💎  Джекпот ждёт своего героя!\n\n"
+    f"<i>🎁  Играй и выигрывай крупные суммы!</i>",
+
+    f"<b>✨  Поздний вечер, игроки!</b>\n"
+    f"<i>━━━━━━━━━━━━━━━</i>\n\n"
+    f"💫  Ночная игра — особый азарт!\n"
+    f"🌙  Попробуй свою удачу сейчас!\n\n"
+    f"<i>💥  Не упусти свой шанс!</i>",
 ]
 
 
@@ -1679,15 +1738,25 @@ async def auto_broadcast():
     await asyncio.sleep(60)
     while True:
         try:
+            hour = datetime.now().hour
+            if 6 <= hour < 12:
+                msg_text = BROADCAST_MESSAGES[0]
+            elif 12 <= hour < 18:
+                msg_text = BROADCAST_MESSAGES[1]
+            elif 18 <= hour < 23:
+                msg_text = BROADCAST_MESSAGES[2]
+            else:
+                msg_text = BROADCAST_MESSAGES[3]
+
             conn = sqlite3.connect(DB_PATH)
             c = conn.cursor()
             c.execute("SELECT uid FROM users")
             uids = [r[0] for r in c.fetchall()]
             conn.close()
             if uids:
-                msg_text = random.choice(MOTIVATION_MESSAGES)
                 kb = InlineKeyboardMarkup(inline_keyboard=[
-                    [InlineKeyboardButton(text="🎮  Играть сейчас", callback_data="menu_games")],
+                    [InlineKeyboardButton(text="🎮  Играть сейчас", callback_data="menu_games",
+                                          icon_custom_emoji_id=PE_DICE)],
                 ])
                 sent, failed = 0, 0
                 for uid in uids:
@@ -1696,9 +1765,9 @@ async def auto_broadcast():
                         sent += 1
                         await asyncio.sleep(0.05)
                     except: failed += 1
-                print(f"📢 Авто-рассылка: {sent} | қате: {failed}")
+                print(f"📢 Рассылка: {sent} | қате: {failed}")
         except Exception as e:
-            print(f"❌ Авто-рассылка: {e}")
+            print(f"❌ Рассылка: {e}")
         await asyncio.sleep(3600)
 
 
@@ -1736,7 +1805,7 @@ async def cb_noop(cb: types.CallbackQuery):
 async def main():
     db_init()
     print("=" * 40)
-    print("🚀  RAILTRY запущен!")
+    print("🎲  BLACKDICE запущен!")
     me = await bot.get_me()
     print(f"Бот: @{me.username}")
     print(f"📁 DB: {DB_PATH}")
