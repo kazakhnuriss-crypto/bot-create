@@ -1,206 +1,161 @@
-import asyncio
-import logging
+
 import os
+import threading
+import io
+import secrets
 
-from aiogram import Bot, Dispatcher, F, Router
-from aiogram.client.default import DefaultBotProperties
-from aiogram.enums import ParseMode
-from aiogram.filters import CommandStart
-from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
-from aiogram.utils.keyboard import InlineKeyboardBuilder
+import telebot
+from telebot import types
+from flask import Flask, request, jsonify
+from dotenv import load_dotenv
 
-BOT_TOKEN = os.getenv("BOT_TOKEN", "PUT_YOUR_TOKEN_HERE")
+load_dotenv()
 
-# ====== Премиум emoji ID-лері (өз ID-леріңізге ауыстырыңыз) ======
-# ID алу үшін: ботқа премиум emoji жіберіңіз - ол ID-ін қайтарады
-EMOJI_START = "5445284980978621387"   # старт кнопкасындағы иконка
-EMOJI_OK = "5445284980978621387"
-EMOJI_BAD = "5445284980978621387"
-EMOJI_RESTART = "5445284980978621387"
-# <tg-emoji> мәтінде көрінуі үшін fallback ретінде кәдімгі emoji қойылады
-TEXT_EMOJI = '<tg-emoji emoji-id="5445284980978621387">🎯</tg-emoji>'
+BOT_TOKEN = os.getenv("BOT_TOKEN", "")
+ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
+PORT = int(os.getenv("PORT", "8080"))
 
-# ====== Сұрақтар: (сұрақ, [жауаптар], дұрыс жауап индексі) ======
-QUESTIONS = [
-    ("Қазақстанның астанасы қай қала?", ["Алматы", "Астана", "Шымкент"], 1),
-    ("2 + 2 × 2 = ?", ["8", "6", "4"], 1),
-    ("Python-да тізімге элемент қосатын әдіс?", ["add()", "push()", "append()"], 2),
-    ("Telegram қай жылы құрылды?", ["2013", "2010", "2016"], 0),
-    ("Жер Күнді айналып шығады, ол қанша уақыт?", ["1 ай", "1 жыл", "1 апта"], 1),
-]
+MIN_STARS = 50
+MAX_STARS = 10000
+RATE = 8.8
 
-router = Router()
-# user_id -> {"q": ағымдағы сұрақ нөмірі, "score": ұпай}
-progress: dict[int, dict] = {}
+if not BOT_TOKEN or not ADMIN_ID:
+    raise ValueError("BOT_TOKEN және ADMIN_ID мәндерін .env файлына енгізіңіз")
 
+bot = telebot.TeleBot(BOT_TOKEN)
+app = Flask(__name__)
+app.config["MAX_CONTENT_LENGTH"] = 8 * 1024 * 1024
 
-# ---------- Клавиатуралар ----------
-def start_keyboard() -> InlineKeyboardMarkup:
-    """Кнопка «Тестті бастау»"""
-    builder = InlineKeyboardBuilder()
-    builder.row(
-        InlineKeyboardButton(
-            text="Тестті бастау",
-            callback_data="start_test",
-            style="primary",
-            icon_custom_emoji_id=EMOJI_START,
-        )
-    )
-    return builder.as_markup()
+orders = {}
 
+@app.get("/")
+def home():
+    return "Stars Shop API is running"
 
-def question_keyboard(q_index: int) -> InlineKeyboardMarkup:
-    builder = InlineKeyboardBuilder()
-    for i, answer in enumerate(QUESTIONS[q_index][1]):
-        builder.row(
-            InlineKeyboardButton(
-                text=answer,
-                callback_data=f"ans:{q_index}:{i}",
-                style="default",
-            )
-        )
-    return builder.as_markup()
+@app.post("/api/order")
+def create_order():
+    amount = request.form.get("amount", type=int)
+    user_id = request.form.get("telegram_user_id", type=str)
+    username = request.form.get("telegram_username", "")
+    receipt = request.files.get("receipt")
 
+    if amount is None or not MIN_STARS <= amount <= MAX_STARS:
+        return jsonify(error="Invalid Stars amount"), 400
 
-def next_keyboard(is_last: bool) -> InlineKeyboardMarkup:
-    builder = InlineKeyboardBuilder()
-    builder.row(
-        InlineKeyboardButton(
-            text="Нәтижені көру" if is_last else "Келесі сұрақ",
-            callback_data="next",
-            style="success",
-            icon_custom_emoji_id=EMOJI_OK,
-        )
-    )
-    return builder.as_markup()
+    if not user_id or not user_id.isdigit():
+        return jsonify(error="Open the Mini App in Telegram"), 400
 
+    if not receipt or not receipt.filename.lower().endswith(".pdf"):
+        return jsonify(error="PDF receipt required"), 400
 
-def restart_keyboard() -> InlineKeyboardMarkup:
-    """Кнопка «Тестті қайта өту»"""
-    builder = InlineKeyboardBuilder()
-    builder.row(
-        InlineKeyboardButton(
-            text="Тестті қайта өту",
-            callback_data="start_test",
-            style="danger",
-            icon_custom_emoji_id=EMOJI_RESTART,
-        )
-    )
-    return builder.as_markup()
+    content = receipt.read()
 
+    if not content.startswith(b"%PDF-"):
+        return jsonify(error="Invalid PDF file"), 400
 
-# ---------- Көмекші ----------
-async def send_question(message: Message, user_id: int) -> None:
-    q = progress[user_id]["q"]
-    text = f"{TEXT_EMOJI} <b>Сұрақ {q + 1}/{len(QUESTIONS)}</b>\n\n{QUESTIONS[q][0]}"
-    await message.edit_text(text, reply_markup=question_keyboard(q))
+    order_id = secrets.token_hex(5)
+    total = amount * RATE
 
+    orders[order_id] = {
+        "user_id": int(user_id),
+        "amount": amount,
+        "total": total,
+        "status": "pending"
+    }
 
-# ---------- Хэндлерлер ----------
-@router.message(CommandStart())
-async def cmd_start(message: Message):
-    await message.answer(
-        f"{TEXT_EMOJI} <b>Тест ботына қош келдіңіз!</b>\n\n"
-        f"{len(QUESTIONS)} сұраққа жауап беріп, білімді тексеріңіз.\n"
-        "Бастау үшін төмендегі кнопканы басыңыз.\n\n"
-        "💡 Премиум emoji ID-ін білгіңіз келсе, ботқа сол emoji-ді жіберіңіз.",
-        reply_markup=start_keyboard(),
+    caption = (
+        f"🧾 НОВЫЙ ЗАКАЗ\n\n"
+        f"Заказ: {order_id}\n"
+        f"User ID: {user_id}\n"
+        f"Username: @{username or 'не указан'}\n"
+        f"Stars: {amount}\n"
+        f"К оплате: {total:.2f} ₸\n"
+        f"Статус: Ожидает проверки"
     )
 
+    keyboard = types.InlineKeyboardMarkup()
+    keyboard.row(
+        types.InlineKeyboardButton(
+            "✅ Подтвердить",
+            callback_data=f"approve:{order_id}"
+        ),
+        types.InlineKeyboardButton(
+            "❌ Отклонить",
+            callback_data=f"reject:{order_id}"
+        )
+    )
 
-@router.callback_query(F.data == "start_test")
-async def start_test(call: CallbackQuery):
-    progress[call.from_user.id] = {"q": 0, "score": 0}
-    await send_question(call.message, call.from_user.id)
-    await call.answer()
+    try:
+        bot.send_document(
+            ADMIN_ID,
+            document=io.BytesIO(content),
+            visible_file_name="receipt.pdf",
+            caption=caption,
+            reply_markup=keyboard
+        )
+        bot.send_message(
+            int(user_id),
+            f"✅ Заказ {order_id} принят на проверку.\n"
+            f"Количество: {amount} Stars\n"
+            f"Сумма: {total:.2f} ₸"
+        )
+    except Exception:
+        orders.pop(order_id, None)
+        return jsonify(error="Could not send order to admin"), 500
 
+    return jsonify(ok=True, order_id=order_id)
 
-@router.callback_query(F.data.startswith("ans:"))
-async def answer(call: CallbackQuery):
-    user_id = call.from_user.id
-    if user_id not in progress:
-        await call.answer("Тестті қайта бастаңыз: /start", show_alert=True)
+@bot.callback_query_handler(
+    func=lambda call: call.data.startswith(("approve:", "reject:"))
+)
+def process_order(call):
+    if call.from_user.id != ADMIN_ID:
+        bot.answer_callback_query(call.id, "Нет доступа")
         return
 
-    _, q_str, a_str = call.data.split(":")
-    q_index, a_index = int(q_str), int(a_str)
+    action, order_id = call.data.split(":", 1)
+    order = orders.get(order_id)
 
-    # ескі сұраққа қайта басудан қорғау
-    if q_index != progress[user_id]["q"]:
-        await call.answer()
+    if not order:
+        bot.answer_callback_query(call.id, "Заказ не найден")
         return
 
-    question, answers, correct = QUESTIONS[q_index]
-    is_correct = a_index == correct
-    if is_correct:
-        progress[user_id]["score"] += 1
-
-    # Жауаптарды түспен көрсету: дұрысы - жасыл, қателігі - қызыл
-    builder = InlineKeyboardBuilder()
-    for i, ans in enumerate(answers):
-        if i == correct:
-            style = "success"
-        elif i == a_index:
-            style = "danger"
-        else:
-            style = "default"
-        builder.row(InlineKeyboardButton(text=ans, callback_data="noop", style=style))
-    is_last = q_index == len(QUESTIONS) - 1
-    builder.attach(InlineKeyboardBuilder.from_markup(next_keyboard(is_last)))
-
-    verdict = "✅ Дұрыс!" if is_correct else f"❌ Қате. Дұрыс жауап: <b>{answers[correct]}</b>"
-    await call.message.edit_text(
-        f"<b>Сұрақ {q_index + 1}/{len(QUESTIONS)}</b>\n\n{question}\n\n{verdict}",
-        reply_markup=builder.as_markup(),
-    )
-    await call.answer()
-
-
-@router.callback_query(F.data == "next")
-async def next_question(call: CallbackQuery):
-    user_id = call.from_user.id
-    if user_id not in progress:
-        await call.answer("Тестті қайта бастаңыз: /start", show_alert=True)
+    if order["status"] != "pending":
+        bot.answer_callback_query(call.id, "Заказ уже обработан")
         return
 
-    progress[user_id]["q"] += 1
-    if progress[user_id]["q"] >= len(QUESTIONS):
-        score = progress[user_id]["score"]
-        total = len(QUESTIONS)
-        percent = round(score / total * 100)
-        await call.message.edit_text(
-            f"{TEXT_EMOJI} <b>Тест аяқталды!</b>\n\n"
-            f"Нәтиже: <b>{score}/{total}</b> ({percent}%)",
-            reply_markup=restart_keyboard(),
+    user_id = order["user_id"]
+
+    if action == "approve":
+        order["status"] = "approved"
+        bot.send_message(
+            user_id,
+            f"✅ Заказ {order_id} подтверждён администратором.\n"
+            f"Количество: {order['amount']} Stars\n"
+            "Заказ принят в обработку."
         )
-        progress.pop(user_id, None)
+        bot.answer_callback_query(call.id, "Заказ подтверждён")
     else:
-        await send_question(call.message, user_id)
-    await call.answer()
+        order["status"] = "rejected"
+        bot.send_message(
+            user_id,
+            f"❌ Заказ {order_id} отклонён.\n"
+            "Если оплата выполнена, свяжитесь с поддержкой."
+        )
+        bot.answer_callback_query(call.id, "Заказ отклонён")
 
+    try:
+        bot.edit_message_reply_markup(
+            call.message.chat.id,
+            call.message.message_id,
+            reply_markup=None
+        )
+    except Exception:
+        pass
 
-@router.callback_query(F.data == "noop")
-async def noop(call: CallbackQuery):
-    await call.answer()
-
-
-# ---------- Премиум emoji конвертері ----------
-@router.message(F.entities)
-async def emoji_converter(message: Message):
-    ids = [e.custom_emoji_id for e in message.entities if e.type == "custom_emoji"]
-    if not ids:
-        return
-    await message.answer("\n".join(f"<code>{i}</code>" for i in ids))
-
-
-async def main():
-    logging.basicConfig(level=logging.INFO)
-    bot = Bot(BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
-    dp = Dispatcher()
-    dp.include_router(router)
-    await bot.delete_webhook(drop_pending_updates=True)
-    await dp.start_polling(bot)
-
+def run_bot():
+    bot.infinity_polling(skip_pending=True)
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    threading.Thread(target=run_bot, daemon=True).start()
+    app.run(host="0.0.0.0", port=PORT)
